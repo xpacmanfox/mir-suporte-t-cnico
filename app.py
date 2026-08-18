@@ -5,6 +5,32 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 import pypdf
+from pathlib import Path
+
+# --- Configuração de Pasta ---
+PASTA_DOCS = Path("./Docs")
+PASTA_DOCS.mkdir(exist_ok=True)
+
+st.sidebar.header("📂 Administração do Mir")
+
+# Botão de Upload
+uploaded_files = st.sidebar.file_uploader(
+    "Carregar manuais técnicos (PDF)", type=["pdf"], accept_multiple_files=True
+)
+
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        caminho_salvamento = PASTA_DOCS / uploaded_file.name
+        
+        # Salva o arquivo na pasta Docs do servidor
+        with open(caminho_salvamento, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+    
+    st.sidebar.success(f"{len(uploaded_files)} arquivo(s) carregado(s)!")
+    
+    # DICA: Se você tiver uma função que indexa os PDFs no ChromaDB, 
+    # chame ela aqui para atualizar a memória do Mir automaticamente.
+    # Exemplo: indexar_manuais_pasta(PASTA_DOCS)
 
 # Configuração da página do Streamlit
 st.set_page_config(
