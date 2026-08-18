@@ -1,0 +1,10 @@
+﻿Docs/
+minibd/
+db_docs/
+dist/
+__pycache__/
+*.exe
+*.sqlite3
+*.ppt
+*.pptx
+*.pdf
