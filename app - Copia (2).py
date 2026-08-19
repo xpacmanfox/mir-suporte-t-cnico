@@ -1,5 +1,4 @@
 import os
-import base64
 from pathlib import Path
 import streamlit as st
 import chromadb
@@ -67,13 +66,6 @@ def indexar_arquivo(caminho_arquivo):
     except Exception as e:
         print(f"Erro ao indexar {caminho_arquivo}: {e}")
         return False
-
-def converter_imagem_para_base64(uploaded_file):
-    """Converte arquivo de imagem enviado pelo Streamlit para string base64."""
-    bytes_data = uploaded_file.getvalue()
-    encoded = base64.b64encode(bytes_data).decode("utf-8")
-    extensao = uploaded_file.type.split("/")[-1]
-    return f"data:image/{extensao};base64,{encoded}"
 
 # --- GESTÃO DE SESSÕES E HISTÓRICO DE CHATS ---
 if "chats_duvidas" not in st.session_state:
@@ -168,75 +160,63 @@ with st.sidebar:
         
     st.info(f"**Status:** Sistema Pronto\n\n📁 {total_pdfs} PDFs encontrados\n📚 {total_trechos} trechos ativos")
 
-# --- ABA 1: DÚVIDAS TÉCNICAS ---
+# --- ABA 1: DÚVIDAS TÉCNICAS (CONSULTA CONSULTIVA) ---
 if aba_selecionada == "📖 Dúvidas Técnicas":
     st.markdown("### 📖 Dúvidas Técnicas e Consultas")
     
+    # Recupera o chat atual de dúvidas
     chat_idx = st.session_state.chat_atual_duvidas
     chat_atual = st.session_state.chats_duvidas[chat_idx]
 
-    # Exibir histórico
+    # Exibir histórico de conversas do chat ativo
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            if isinstance(msg["content"], list):
-                for item in msg["content"]:
-                    if item.get("type") == "text":
-                        st.markdown(item["text"])
-                    elif item.get("type") == "image_url":
-                        st.image(item["image_url"]["url"], width=300)
-            else:
-                st.markdown(msg["content"])
-
-    # Área para envio opcional de imagem
-    with st.expander("📎 Anexar imagem para esta mensagem (Opcional)"):
-        imagem_enviada_duvida = st.file_uploader("Escolha uma imagem", type=["png", "jpg", "jpeg"], key="uploader_duvida")
-
+            st.markdown(msg["content"])
+    
     if pergunta := st.chat_input("Qual dúvida técnica você tem hoje?"):
-        conteudo_usuario = []
+        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
         
-        if imagem_enviada_duvida is not None:
-            img_url = converter_imagem_para_base64(imagem_enviada_duvida)
-            conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
-        
-        conteudo_usuario.append({"type": "text", "text": pergunta})
-
-        chat_atual["mensagens"].append({"role": "user", "content": conteudo_usuario})
-        
+        # Atualiza o título do chat dinamicamente se for o primeiro termo
         if chat_atual["titulo"].startswith("Nova Dúvida") or chat_atual["titulo"].startswith("Dúvida"):
             chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
 
         with st.chat_message("user", avatar="👤"):
-            if imagem_enviada_duvida is not None:
-                st.image(imagem_enviada_duvida, width=300)
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
-            with st.spinner("Realizando busca profunda nos manuais e analisando dados..."):
+            with st.spinner("Realizando busca profunda nos manuais..."):
                 try:
+                    # Aumento de n_results para ter mais contexto (12 trechos)
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
                     resultados = collection.query(query_embeddings=pergunta_vetor, n_results=12)
                     
                     contexto_partes = []
+                    fontes_encontradas = set()
                     if resultados and resultados["documents"] and resultados["documents"][0]:
                         for doc, meta in zip(resultados["documents"][0], resultados["metadatas"][0]):
                             contexto_partes.append(f"Fonte: {meta.get('source', 'Desconhecido')} | Conteúdo: {doc}")
+                            fontes_encontradas.add(meta.get('source', 'Manual'))
                     
                     contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
                     
+                    # Prompt Refinado (Mais autoridade e rigor)
                     system_prompt = (
-                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada no contexto fornecido e em inspeções visuais se houver imagem.\n"
+                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada APENAS no contexto fornecido.\n"
+                        "PASSO A PASSO PARA RESPONDER:\n"
+                        "1. Analise todos os trechos fornecidos abaixo.\n"
+                        "2. Se a resposta estiver nos trechos, crie uma resposta estruturada (tópicos são preferidos).\n"
+                        "3. Se a informação for insuficiente, diga: 'Com base na documentação disponível, não foi possível confirmar este dado' e dê uma sugestão de onde procurar.\n"
+                        "4. Sempre cite a fonte (nome do PDF) ao lado da informação técnica.\n\n"
                         f"CONTEXTO EXTRAÍDO:\n{contexto}"
                     )
 
-                    # Prepara mensagens para OpenAI (suporta texto + imagem)
-                    messages_payload = [{"role": "system", "content": system_prompt}]
-                    for m in chat_atual["mensagens"]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
-
                     response = client.chat.completions.create(
                         model="openai/gpt-4o-mini",
-                        messages=messages_payload,
-                        temperature=0.0
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Pergunta: {pergunta}. Responda de forma detalhada e técnica."}
+                        ],
+                        temperature=0.0 # Temperatura zero para maior precisão técnica
                     )
                     
                     resposta_ia = response.choices[0].message.content
@@ -255,43 +235,23 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
     chat_idx = st.session_state.chat_atual_falhas
     chat_atual = st.session_state.chats_falhas[chat_idx]
 
-    # Exibir histórico
+    # Exibir histórico de conversas do chat ativo
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            if isinstance(msg["content"], list):
-                for item in msg["content"]:
-                    if item.get("type") == "text":
-                        st.markdown(item["text"])
-                    elif item.get("type") == "image_url":
-                        st.image(item["image_url"]["url"], width=300)
-            else:
-                st.markdown(msg["content"])
+            st.markdown(msg["content"])
 
-    # Área para envio opcional de imagem
-    with st.expander("📎 Anexar tela de falha, parâmetros ou foto de componente (Opcional)"):
-        imagem_enviada_falha = st.file_uploader("Escolha uma imagem", type=["png", "jpg", "jpeg"], key="uploader_falha")
-
+    # Entrada do usuário
     if pergunta := st.chat_input("Descreva o equipamento, sistema e sintomas da falha..."):
-        conteudo_usuario = []
-        
-        if imagem_enviada_falha is not None:
-            img_url = converter_imagem_para_base64(imagem_enviada_falha)
-            conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
-        
-        conteudo_usuario.append({"type": "text", "text": pergunta})
-
-        chat_atual["mensagens"].append({"role": "user", "content": conteudo_usuario})
+        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
         
         if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
             chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
 
         with st.chat_message("user", avatar="👤"):
-            if imagem_enviada_falha is not None:
-                st.image(imagem_enviada_falha, width=300)
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
-            with st.spinner("Analisando falha, parâmetros e manuais..."):
+            with st.spinner("Analisando falha e manuais..."):
                 try:
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
                     resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
@@ -313,26 +273,26 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                         "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII).\n"
                         "Sua linguagem é técnica, direta e prática, voltada para profissionais de oficina (mecânicos e eletricistas).\n\n"
                         "DIRETRIZES DE RESPOSTA:\n"
-                        "1. ANÁLISE DE DADOS E IMAGENS: Sempre analise as variáveis (MR, BP, ER, BC, etc.) e o conteúdo da imagem anexada antes de dar o diagnóstico. Explique o porquê de cada valor ser relevante.\n"
+                        "1. ANÁLISE DE DADOS: Sempre analise as variáveis (MR, BP, ER, BC, etc.) antes de dar o diagnóstico. Explique o porquê de cada valor ser relevante.\n"
                         "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum (ex: 1106 = ERCP/13CP), comece por ela.\n"
-                        "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade.\n"
-                        "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina?\n\n"
+                        "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade (o que é mais fácil/barato de verificar primeiro).\n"
+                        "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina? Liste os testes físicos e inspeções (ex: verificar escape, estrangulador, calibração).\n"
+                        "5. POSTURA: Aja como um colega sênior de oficina. Se o usuário fornecer logs, monte uma linha de raciocínio. Se faltarem dados, peça os eventos anteriores/posteriores.\n\n"
                         "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
                         "### 🔎 Interpretação do Evento\n"
-                        "### 📊 Análise das Pressões / Imagem\n"
+                        "### 📊 Análise das Pressões\n"
                         "### 💡 Minha Hipótese de Diagnóstico\n"
                         "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
                         f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
                         f"Fontes/Documentos disponíveis para referência: {fontes_str}"
                     )
 
-                    messages_payload = [{"role": "system", "content": system_prompt}]
-                    for m in chat_atual["mensagens"]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
-
                     response = client.chat.completions.create(
                         model="openai/gpt-4o-mini",
-                        messages=messages_payload,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": pergunta}
+                        ],
                         temperature=0.1
                     )
                     resposta_ia = response.choices[0].message.content
