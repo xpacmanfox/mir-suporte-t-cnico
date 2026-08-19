@@ -14,6 +14,23 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- CSS CUSTOMIZADO PARA LIMPR O FILE UPLOADER ---
+st.markdown("""
+<style>
+    /* Esconde o texto de limite de tamanho e tipos de arquivo do file_uploader */
+    [data-testid="stFileUploader"] section small {
+        display: none !important;
+    }
+    [data-testid="stFileUploader"] section div span {
+        display: none !important;
+    }
+    /* Deixa o botão de upload mais compacto e com o texto 'print' */
+    [data-testid="stFileUploader"] button {
+        width: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- Configuração de Pastas ---
 PASTA_BASE_MANUAIS = Path("./Docs")
 PASTA_BASE_MANUAIS.mkdir(exist_ok=True)
@@ -183,12 +200,11 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
             else:
                 st.markdown(msg["content"])
 
-    # Layout limpo: Input de texto e botão de arquivo lado a lado na parte inferior
-    col_input, col_file = st.columns([0.88, 0.12])
+    col_input, col_file = st.columns([0.86, 0.14])
     with col_input:
         pergunta = st.chat_input("Qual dúvida técnica você tem hoje?", key="input_duvida")
     with col_file:
-        imagem_enviada_duvida = st.file_uploader("📷", type=["png", "jpg", "jpeg"], key="uploader_duvida", label_visibility="collapsed")
+        imagem_enviada_duvida = st.file_uploader("print", type=["png", "jpg", "jpeg"], key="uploader_duvida")
 
     if pergunta:
         conteudo_usuario = []
@@ -223,22 +239,27 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
                     
                     system_prompt = (
-                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada no contexto fornecido.\n"
-                        "Você deve procurar qualquer vestígio do assunto nos arquivos da base de dados, caso não encontre pode procurar na internet, porém sem inventar dados ou valores.\n"
+                        "Você é o Mir, um assistente especialista sênior em engenharia e manutenção ferroviária. "
                         "Sua função principal é atuar como um consultor técnico de suporte, respondendo a dúvidas, "
-                        "explicando conceitos e detalhando especificações **com base estrita nos manuais e documentos indexados na base de dados**.\n\n"
-                        
+                        "explicando conceitos e detalhando especificações com base estrita nos manuais e documentos indexados na base de dados.\n\n"
                         "DIRETRIZES DE ATUAÇÃO:\n"
-                        "1. **Fidelidade ao Contexto:** Utilize os trechos dos manuais fornecidos abaixo como sua fonte primária de verdade técnica.\n"
-                        "2. **Clareza e Estrutura:** Explique os conceitos de forma didática, organizada em tópicos (bullet points) ou passos, facilitando o entendimento de operadores, técnicos ou engenheiros.\n"
-                        "3. **Transparência em Caso de Omissão:** Se a resposta exata não constar nos trechos fornecidos, informe educadamente: 'Com base na documentação atualmente indexada, não encontrei detalhes específicos sobre este ponto'. Em seguida, se for seguro e parte de boas práticas ferroviárias gerais, ofereça uma orientação técnica complementar, mas **sempre ressalvando** que se trata de uma recomendação geral e não de uma norma oficial do documento.\n"
-                        "4. **Citação de Fontes:** Sempre que utilizar informações técnicas, parâmetros, limites ou procedimentos dos trechos.\n\n"
-                        f"CONTEXTO EXTRAÍDO:\n{contexto}"
+                        "1. Fidelidade ao Contexto: Utilize os trechos dos manuais fornecidos abaixo como sua fonte primária de verdade técnica.\n"
+                        "2. Clareza e Estrutura: Explique os conceitos de forma didática, organizada em tópicos (bullet points) ou passos.\n"
+                        "3. Transparência em Caso de Omissão: Se a resposta exata não constar, informe educadamente e dê uma orientação geral ressalvando que não consta no manual.\n"
+                        "4. Citação de Fontes: Sempre cite o nome do documento (PDF) correspondente ao lado da informação.\n\n"
+                        f"CONTEXTO TÉCNICO EXTRAÍDO DOS MANUAIS:\n{contexto}"
                     )
 
+                    # Limpa histórico para a API: envia apenas texto nas mensagens anteriores para evitar reenvio de imagens antigas
                     messages_payload = [{"role": "system", "content": system_prompt}]
-                    for m in chat_atual["mensagens"]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
+                    for m in chat_atual["mensagens"][:-1]:
+                        texto_limpo = m["content"]
+                        if isinstance(texto_limpo, list):
+                            texto_limpo = next((item["text"] for item in texto_limpo if item.get("type") == "text"), "")
+                        messages_payload.append({"role": m["role"], "content": texto_limpo})
+                    
+                    # Mensagem atual com imagem (se houver)
+                    messages_payload.append({"role": "user", "content": chat_atual["mensagens"][-1]["content"]})
 
                     response = client.chat.completions.create(
                         model="openai/gpt-4o-mini",
@@ -249,7 +270,7 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
-                    st.rerun() # Recarrega a página para limpar a imagem enviada do uploader
+                    st.rerun()
                     
                 except Exception as e:
                     erro_msg = f"Erro na consulta: {e}"
@@ -274,12 +295,11 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
             else:
                 st.markdown(msg["content"])
 
-    # Layout limpo: Input de texto e botão de arquivo lado a lado na parte inferior
-    col_input, col_file = st.columns([0.88, 0.12])
+    col_input, col_file = st.columns([0.86, 0.14])
     with col_input:
         pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
     with col_file:
-        imagem_enviada_falha = st.file_uploader("📷", type=["png", "jpg", "jpeg"], key="uploader_falha", label_visibility="collapsed")
+        imagem_enviada_falha = st.file_uploader("print", type=["png", "jpg", "jpeg"], key="uploader_falha")
 
     if pergunta:
         conteudo_usuario = []
@@ -320,25 +340,32 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF local indexado para citação."
 
                     system_prompt = (
-                       "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII).\n"
-                        "Sua linguagem é técnica, direta e prática, voltada para profissionais de oficina (mecânicos e eletricistas).\n\n"
+                        "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII e elétrica ferroviária).\n"
+                        "Sua linguagem é técnica, direta, prática e corporativa de oficina (voltada para mecânicos e eletricistas).\n\n"
                         "DIRETRIZES DE RESPOSTA:\n"
-                        "1. ANÁLISE DE DADOS E IMAGENS: Sempre pergunte sobre as variáveis, e analise-as após serem enviadas.\n"
-                        "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum, comece por ela.\n"
-                        "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade.\n"
-                        "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina?\n\n"
+                        "1. ANÁLISE DE DADOS E IMAGENS: Se o usuário enviou uma imagem ou texto com pressões (MR, BP, ER, BC), analise detalhadamente. Caso faltem informações essenciais, aponte o que falta.\n"
+                        "2. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente, comece por ela.\n"
+                        "3. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
+                        "4. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
                         "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
                         "### 🔎 Interpretação do Evento\n"
-                        "### 📊 Análise das variáveis / Imagem\n"
+                        "### 📊 Análise das Variáveis / Imagem\n"
                         "### 💡 Minha Hipótese de Diagnóstico\n"
                         "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
                         f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
                         f"Fontes/Documentos disponíveis para referência: {fontes_str}"
                     )
 
+                    # Limpa histórico para a API: envia apenas texto nas mensagens anteriores para evitar reenvio de imagens antigas
                     messages_payload = [{"role": "system", "content": system_prompt}]
-                    for m in chat_atual["mensagens"]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
+                    for m in chat_atual["mensagens"][:-1]:
+                        texto_limpo = m["content"]
+                        if isinstance(texto_limpo, list):
+                            texto_limpo = next((item["text"] for item in texto_limpo if item.get("type") == "text"), "")
+                        messages_payload.append({"role": m["role"], "content": texto_limpo})
+                    
+                    # Mensagem atual com imagem (se houver)
+                    messages_payload.append({"role": "user", "content": chat_atual["mensagens"][-1]["content"]})
 
                     response = client.chat.completions.create(
                         model="openai/gpt-4o-mini",
@@ -348,7 +375,7 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
-                    st.rerun() # Recarrega a página para limpar a imagem enviada do uploader
+                    st.rerun()
                 except Exception as e:
                     erro_msg = f"Erro no pipeline de IA: {e}"
                     st.error(erro_msg)
