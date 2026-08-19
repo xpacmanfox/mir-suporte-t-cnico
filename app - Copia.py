@@ -69,20 +69,12 @@ def indexar_arquivo(caminho_arquivo):
 
 # --- GESTÃO DE SESSÕES E HISTÓRICO DE CHATS ---
 if "chats_duvidas" not in st.session_state:
-    st.session_state.chats_duvidas = [{
-        "id": 1, 
-        "titulo": "Nova Dúvida", 
-        "mensagens": [{"role": "assistant", "content": "Olá. Use este canal para retirar dúvidas gerais, realizar consultas técnicas ou verificar especificações priorizando os manuais indexados."}]
-    }]
+    st.session_state.chats_duvidas = [{"id": 1, "titulo": "Nova Dúvida", "mensagens": [{"role": "assistant", "content": "Olá. Use este canal para retirar dúvidas gerais, realizar consultas técnicas ou verificar especificações priorizando os manuais indexados."}]}]
 if "chat_atual_duvidas" not in st.session_state:
     st.session_state.chat_atual_duvidas = 0
 
 if "chats_falhas" not in st.session_state:
-    st.session_state.chats_falhas = [{
-        "id": 1, 
-        "titulo": "Nova Falha", 
-        "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Estou pronto para auxiliar técnicos, mecânicos, eletricistas, inspetores e engenheiros. Descreva a falha ou anomalia observada."}]
-    }]
+    st.session_state.chats_falhas = [{"id": 1, "titulo": "Nova Falha", "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Estou pronto para auxiliar técnicos, mecânicos, eletricistas, inspetores e engenheiros. Descreva a falha ou anomalia observada."}]}]
 if "chat_atual_falhas" not in st.session_state:
     st.session_state.chat_atual_falhas = 0
 
@@ -94,22 +86,18 @@ with st.sidebar:
 
     aba_selecionada = st.radio(
         "Navegação",
-        ["📖 Dúvidas Técnicas", "⚙️ Análise de Falhas", "📂 Adicionar Conhecimento"],
+        ["💬 Dúvidas", "⚙️ Análise de Falhas", "📂 Adicionar Conhecimento"],
         label_visibility="collapsed"
     )
 
     st.divider()
     
     # Histórico de conversas baseado na aba ativa
-    if aba_selecionada == "📖 Dúvidas Técnicas":
+    if aba_selecionada == "💬 Dúvidas":
         st.markdown("### 🕒 Histórico de Dúvidas")
         if st.button("➕ Novo Chat de Dúvidas", use_container_width=True):
             novo_id = len(st.session_state.chats_duvidas) + 1
-            st.session_state.chats_duvidas.append({
-                "id": novo_id, 
-                "titulo": f"Dúvida {novo_id}", 
-                "mensagens": [{"role": "assistant", "content": "Olá. Qual consulta deseja realizar?"}]
-            })
+            st.session_state.chats_duvidas.append({"id": novo_id, "titulo": f"Dúvida {novo_id}", "mensagens": [{"role": "assistant", "content": "Olá. Qual consulta deseja realizar?"}]})
             st.session_state.chat_atual_duvidas = len(st.session_state.chats_duvidas) - 1
             st.rerun()
 
@@ -130,11 +118,7 @@ with st.sidebar:
         st.markdown("### 🕒 Histórico de Falhas")
         if st.button("➕ Novo Chat de Falhas", use_container_width=True):
             novo_id = len(st.session_state.chats_falhas) + 1
-            st.session_state.chats_falhas.append({
-                "id": novo_id, 
-                "titulo": f"Falha {novo_id}", 
-                "mensagens": [{"role": "assistant", "content": "Descreva a nova ocorrência ou falha observada."}]
-            })
+            st.session_state.chats_falhas.append({"id": novo_id, "titulo": f"Falha {novo_id}", "mensagens": [{"role": "assistant", "content": "Descreva a nova ocorrência ou falha observada."}]})
             st.session_state.chat_atual_falhas = len(st.session_state.chats_falhas) - 1
             st.rerun()
 
@@ -161,41 +145,31 @@ with st.sidebar:
     st.info(f"**Status:** Sistema Pronto\n\n📁 {total_pdfs} PDFs encontrados\n📚 {total_trechos} trechos ativos")
 
 # --- ABA 1: DÚVIDAS TÉCNICAS (CONSULTA CONSULTIVA) ---
-if aba_selecionada == "📖 Dúvidas Técnicas":
+elif aba_selecionada == "📖 Dúvidas Técnicas":
     st.markdown("### 📖 Dúvidas Técnicas e Consultas")
     
-    chat_idx = st.session_state.chat_atual_duvidas
-    chat_atual = st.session_state.chats_duvidas[chat_idx]
-
-    # Exibir histórico de conversas do chat ativo
-    for msg in chat_atual["mensagens"]:
-        with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            st.markdown(msg["content"])
-
     if pergunta := st.chat_input("Qual dúvida técnica você tem hoje?"):
-        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
-        
-        if chat_atual["titulo"].startswith("Nova Dúvida") or chat_atual["titulo"].startswith("Dúvida"):
-            chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
-
+        st.session_state.mensagens_duvidas.append({"role": "user", "content": pergunta})
         with st.chat_message("user", avatar="👤"):
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
             with st.spinner("Realizando busca profunda nos manuais..."):
                 try:
+                    # Aumento de n_results para ter mais contexto (12 trechos)
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
                     resultados = collection.query(query_embeddings=pergunta_vetor, n_results=12)
                     
                     contexto_partes = []
                     fontes_encontradas = set()
-                    if resultados and resultados["documents"] and resultados["documents"][0]:
+                    if resultados and resultados["documents"]:
                         for doc, meta in zip(resultados["documents"][0], resultados["metadatas"][0]):
                             contexto_partes.append(f"Fonte: {meta.get('source', 'Desconhecido')} | Conteúdo: {doc}")
                             fontes_encontradas.add(meta.get('source', 'Manual'))
                     
-                    contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
+                    contexto = "\n\n".join(contexto_partes)
                     
+                    # Prompt Refinado (Mais autoridade e rigor)
                     system_prompt = (
                         "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada APENAS no contexto fornecido.\n"
                         "PASSO A PASSO PARA RESPONDER:\n"
@@ -212,21 +186,19 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": f"Pergunta: {pergunta}. Responda de forma detalhada e técnica."}
                         ],
-                        temperature=0.0
+                        temperature=0.0 # Temperatura zero para maior precisão técnica
                     )
                     
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
-                    chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    st.session_state.mensagens_duvidas.append({"role": "assistant", "content": resposta_ia})
                     
                 except Exception as e:
-                    erro_msg = f"Erro na consulta: {e}"
-                    st.error(erro_msg)
-                    chat_atual["mensagens"].append({"role": "assistant", "content": erro_msg})
+                    st.error(f"Erro na consulta: {e}")
 
 # --- ABA 2: ANÁLISE DE FALHAS ---
 elif aba_selecionada == "⚙️ Análise de Falhas":
-    st.markdown("### ⚙️ Análise de Falhas e Diagnósticos")
+    st.markdown("### 💬 Análise de Falhas e Diagnósticos")
     
     chat_idx = st.session_state.chat_atual_falhas
     chat_atual = st.session_state.chats_falhas[chat_idx]
@@ -240,6 +212,7 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
     if pergunta := st.chat_input("Descreva o equipamento, sistema e sintomas da falha..."):
         chat_atual["mensagens"].append({"role": "user", "content": pergunta})
         
+        # Define o título dinamicamente com base na primeira mensagem
         if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
             chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
 
@@ -267,18 +240,20 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
 
                     system_prompt = (
                         "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII).\n"
-                        "Sua linguagem é técnica, direta e prática, voltada para profissionais de oficina (mecânicos e eletricistas).\n\n"
-                        "DIRETRIZES DE RESPOSTA:\n"
-                        "1. ANÁLISE DE DADOS: Sempre analise as variáveis (MR, BP, ER, BC, etc.) antes de dar o diagnóstico. Explique o porquê de cada valor ser relevante.\n"
-                        "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum (ex: 1106 = ERCP/13CP), comece por ela.\n"
-                        "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade (o que é mais fácil/barato de verificar primeiro).\n"
-                        "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina? Liste os testes físicos e inspeções (ex: verificar escape, estrangulador, calibração).\n"
-                        "5. POSTURA: Aja como um colega sênior de oficina. Se o usuário fornecer logs, monte uma linha de raciocínio. Se faltarem dados, peça os eventos anteriores/posteriores.\n\n"
-                        "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
-                        "### 🔎 Interpretação do Evento\n"
-                        "### 📊 Análise das Pressões\n"
-                        "### 💡 Minha Hipótese de Diagnóstico\n"
-                        "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
+    "Sua linguagem é técnica, direta e prática, voltada para profissionais de oficina (mecânicos e eletricistas).\n\n"
+    
+    "DIRETRIZES DE RESPOSTA:\n"
+    "1. ANÁLISE DE DADOS: Sempre analise as variáveis (MR, BP, ER, BC, etc.) antes de dar o diagnóstico. Explique o porquê de cada valor ser relevante.\n"
+    "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum (ex: 1106 = ERCP/13CP), comece por ela.\n"
+    "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade (o que é mais fácil/barato de verificar primeiro).\n"
+    "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina? Liste os testes físicos e inspeções (ex: verificar escape, estrangulador, calibração).\n"
+    "5. POSTURA: Aja como um colega sênior de oficina. Se o usuário fornecer logs, monte uma linha de raciocínio. Se faltarem dados, peça os eventos anteriores/posteriores.\n\n"
+    
+    "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
+    "### 🔎 Interpretação do Evento\n"
+    "### 📊 Análise das Pressões\n"
+    "### 💡 Minha Hipótese de Diagnóstico\n"
+    "### 🛠️ Plano de Ação (Checklist de Oficina)\n"
                         f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
                         f"Fontes/Documentos disponíveis para referência: {fontes_str}"
                     )
