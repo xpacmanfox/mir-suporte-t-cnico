@@ -144,65 +144,44 @@ with st.sidebar:
         
     st.info(f"**Status:** Sistema Pronto\n\n📁 {total_pdfs} PDFs encontrados\n📚 {total_trechos} trechos ativos")
 
-# --- ABA 1: DÚVIDAS ---
-if aba_selecionada == "💬 Dúvidas":
-    st.markdown("### 📖 Dúvidas Técnicas e Consultas")
+# --- ABA 3: DÚVIDAS TÉCNICAS (CONSULTA CONSULTIVA) ---
+elif aba_selecionada == "📖 Dúvidas Técnicas":
+    st.markdown("### 🗣️ Conversa Técnica")
     
-    chat_idx = st.session_state.chat_atual_duvidas
-    chat_atual = st.session_state.chats_duvidas[chat_idx]
-
-    # Exibir histórico de conversas do chat ativo
-    for msg in chat_atual["mensagens"]:
+    # Exibir histórico
+    for msg in st.session_state.mensagens_duvidas:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
             st.markdown(msg["content"])
 
-    # Entrada do usuário
-    if pergunta := st.chat_input("Digite sua dúvida técnica ou consulta sobre os manuais..."):
-        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
-        
-        # Define o título dinamicamente com base na primeira mensagem se ainda for padrão
-        if chat_atual["titulo"].startswith("Nova Dúvida") or chat_atual["titulo"].startswith("Dúvida"):
-            chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
-
+    if pergunta := st.chat_input("Consulte o Mir sobre procedimentos ou especificações..."):
+        st.session_state.mensagens_duvidas.append({"role": "user", "content": pergunta})
         with st.chat_message("user", avatar="👤"):
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
-            with st.spinner("Consultando manuais e base técnica..."):
+            with st.spinner("Consultando bases técnicas..."):
                 try:
+                    # Busca aprimorada
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
-                    resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
+                    resultados = collection.query(query_embeddings=pergunta_vetor, n_results=10)
                     
                     contexto_partes = []
-                    fontes_encontradas = set()
-                    if resultados and resultados["documents"] and resultados["documents"][0]:
-                        docs = resultados["documents"][0]
-                        metas = resultados["metadatas"][0] if resultados.get("metadatas") else [{}] * len(docs)
-                        for doc, meta in zip(docs, metas):
-                            contexto_partes.append(doc)
-                            if meta and "source" in meta:
-                                fontes_encontradas.add(meta["source"])
+                    if resultados and resultados["documents"]:
+                        for doc, meta in zip(resultados["documents"][0], resultados["metadatas"][0]):
+                            contexto_partes.append(f"Referência: {meta.get('source', 'Manual')}\nTrecho: {doc}")
                     
-                    contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado na base de PDFs local."
-                    fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF local indexado para citação."
-
+                    contexto = "\n\n".join(contexto_partes)
+                    
+                    # Prompt focado em diálogo técnico consultivo
                     system_prompt = (
-                        "Você é o Mir, um agente especialista sênior em manutenção ferroviária. Sua missão é auxiliar técnicos ferroviários, "
-                        "mecânicos, eletricistas, inspetores e engenheiros.\n\n"
-                        "DIRETRIZES OBRIGATÓRIAS:\n"
-                        "1. PRIORIDADE LOCAL: Consulte rigorosamente os trechos extraídos dos manuais em PDF fornecidos abaixo. Baseie suas respostas primordialmente neles.\n"
-                        "2. SUPLEMENTAÇÃO EXTERNA: Caso os manuais locais não contenham informações completas sobre o assunto, você pode utilizar seu conhecimento geral técnico da indústria ferroviária para complementar a resposta, mas ressalte quando a informação vier de fora dos PDFs locais.\n"
-                        "3. RESTRIÇÕES RÍGIDAS: Nunca invente valores de torque, pressão ou ajustes. Se não houver informação específica nos manuais ou se for incerto, informe claramente essa limitação.\n"
-                        "Ao analisar falhas, siga obrigatoriamente a seguinte estrutura em sua resposta:\n"
-                        "RESUMO\n"
-                        "SINTOMA\n"
-                        "POSSÍVEIS CAUSAS\n"
-                        "VERIFICAÇÕES RECOMENDADAS\n"
-                        "TESTES RECOMENDADOS\n"
-                        "AÇÃO CORRETIVA SUGERIDA\n"
-                        "DOCUMENTOS CONSULTADOS\n\n"
-                        f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
-                        f"Fontes/Documentos disponíveis para referência: {fontes_str}"
+                        "Você é o Mir, um técnico sênior experiente. Seu tom é profissional, direto e colaborativo, "
+                        "como se estivesse conversando com outro colega de profissão.\n"
+                        "DIRETRIZES:\n"
+                        "- Seja conciso e vá direto ao ponto técnico.\n"
+                        "- Se o assunto envolver normas ou limites, cite o manual usado como fonte.\n"
+                        "- Se não souber algo, admita francamente e sugira onde verificar.\n"
+                        "- Evite estruturas de 'diagnóstico' (como causas/soluções). Apenas responda à dúvida técnica como um colega faria.\n\n"
+                        f"CONHECIMENTO DISPONÍVEL:\n{contexto}"
                     )
 
                     response = client.chat.completions.create(
@@ -211,15 +190,15 @@ if aba_selecionada == "💬 Dúvidas":
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": pergunta}
                         ],
-                        temperature=0.1
+                        temperature=0.3 # Ligeiramente mais flexível para um tom de conversa
                     )
+                    
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
-                    chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    st.session_state.mensagens_duvidas.append({"role": "assistant", "content": resposta_ia})
+                    
                 except Exception as e:
-                    erro_msg = f"Erro no pipeline de IA: {e}"
-                    st.error(erro_msg)
-                    chat_atual["mensagens"].append({"role": "assistant", "content": erro_msg})
+                    st.error(f"Erro na consulta: {e}")
 
 # --- ABA 2: ANÁLISE DE FALHAS ---
 elif aba_selecionada == "⚙️ Análise de Falhas":
