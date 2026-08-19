@@ -144,7 +144,7 @@ with st.sidebar:
         
     st.info(f"**Status:** Sistema Pronto\n\n📁 {total_pdfs} PDFs encontrados\n📚 {total_trechos} trechos ativos")
 
-# --- ABA 3: DÚVIDAS TÉCNICAS (CONSULTA CONSULTIVA) ---
+# --- ABA 1: DÚVIDAS TÉCNICAS (CONSULTA CONSULTIVA) ---
 elif aba_selecionada == "📖 Dúvidas Técnicas":
     st.markdown("### 🗣️ Conversa Técnica")
     
