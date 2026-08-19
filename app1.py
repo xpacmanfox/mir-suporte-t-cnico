@@ -248,71 +248,54 @@ elif aba_selecionada == "💬 Análise de Falhas":
                     st.error(erro_msg)
                     st.session_state.mensagens_falhas.append({"role": "assistant", "content": erro_msg})
 
-# --- ABA 3: DÚVIDAS TÉCNICAS ---
+# --- ABA 3: DÚVIDAS TÉCNICAS (OTIMIZADA) ---
 elif aba_selecionada == "📖 Dúvidas Técnicas":
-    col_titulo, col_limpar = st.columns([0.8, 0.2])
-    with col_titulo:
-        st.markdown("### 📖 Dúvidas Técnicas e Consultas")
-    with col_limpar:
-        if st.button("🗑️ Limpar Chat", use_container_width=True):
-            st.session_state.mensagens_duvidas = [
-                {"role": "assistant", "content": "Modo de Dúvidas Técnicas limpo. Qual consulta deseja realizar?"}
-            ]
-            st.rerun()
-
-    # Exibir histórico de conversas
-    for msg in st.session_state.mensagens_duvidas:
-        with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            st.markdown(msg["content"])
-
-    # Entrada do usuário
-    if pergunta := st.chat_input("Digite sua dúvida técnica ou consulta sobre os manuais..."):
+    st.markdown("### 📖 Dúvidas Técnicas e Consultas")
+    
+    if pergunta := st.chat_input("Qual dúvida técnica você tem hoje?"):
         st.session_state.mensagens_duvidas.append({"role": "user", "content": pergunta})
         with st.chat_message("user", avatar="👤"):
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
-            with st.spinner("Consultando manuais e base técnica..."):
+            with st.spinner("Realizando busca profunda nos manuais..."):
                 try:
+                    # Aumento de n_results para ter mais contexto (12 trechos)
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
-                    resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
+                    resultados = collection.query(query_embeddings=pergunta_vetor, n_results=12)
                     
                     contexto_partes = []
                     fontes_encontradas = set()
-                    if resultados and resultados["documents"] and resultados["documents"][0]:
-                        docs = resultados["documents"][0]
-                        metas = resultados["metadatas"][0] if resultados.get("metadatas") else [{}] * len(docs)
-                        for doc, meta in zip(docs, metas):
-                            contexto_partes.append(doc)
-                            if meta and "source" in meta:
-                                fontes_encontradas.add(meta["source"])
+                    if resultados and resultados["documents"]:
+                        for doc, meta in zip(resultados["documents"][0], resultados["metadatas"][0]):
+                            contexto_partes.append(f"Fonte: {meta.get('source', 'Desconhecido')} | Conteúdo: {doc}")
+                            fontes_encontradas.add(meta.get('source', 'Manual'))
                     
-                    contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado na base de PDFs local."
-                    fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF local indexado para citação."
-
+                    contexto = "\n\n".join(contexto_partes)
+                    
+                    # Prompt Refinado (Mais autoridade e rigor)
                     system_prompt = (
-                        "Você é o Mir, um agente especialista sênior em manutenção ferroviária focado em responder dúvidas técnicas e consultas. "
-                        "Sua missão é auxiliar técnicos ferroviários, mecânicos, eletricistas, inspetores e engenheiros.\n\n"
-                        "DIRETRIZES OBRIGATÓRIAS:\n"
-                        "1. PRIORIDADE LOCAL: Consulte rigorosamente os trechos extraídos dos manuais em PDF fornecidos abaixo. Baseie suas respostas primordialmente neles.\n"
-                        "2. SUPLEMENTAÇÃO EXTERNA: Caso os manuais locais não contenham informações suficientes sobre o assunto, você pode utilizar seu conhecimento técnico geral da indústria ferroviária para esclarecer a dúvida, mas ressalte quando a informação vier de fora dos PDFs locais.\n"
-                        "3. RESTRIÇÕES RÍGIDAS: Nunca invente valores de torque, pressão ou ajustes. Se não houver informação específica nos manuais ou se for incerto, informe claramente essa limitação.\n"
-                        f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
-                        f"Fontes/Documentos disponíveis para referência: {fontes_str}"
+                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada APENAS no contexto fornecido.\n"
+                        "PASSO A PASSO PARA RESPONDER:\n"
+                        "1. Analise todos os trechos fornecidos abaixo.\n"
+                        "2. Se a resposta estiver nos trechos, crie uma resposta estruturada (tópicos são preferidos).\n"
+                        "3. Se a informação for insuficiente, diga: 'Com base na documentação disponível, não foi possível confirmar este dado' e dê uma sugestão de onde procurar.\n"
+                        "4. Sempre cite a fonte (nome do PDF) ao lado da informação técnica.\n\n"
+                        f"CONTEXTO EXTRAÍDO:\n{contexto}"
                     )
 
                     response = client.chat.completions.create(
                         model="openai/gpt-4o-mini",
                         messages=[
                             {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": pergunta}
+                            {"role": "user", "content": f"Pergunta: {pergunta}. Responda de forma detalhada e técnica."}
                         ],
-                        temperature=0.1
+                        temperature=0.0 # Temperatura zero para maior precisão técnica
                     )
+                    
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     st.session_state.mensagens_duvidas.append({"role": "assistant", "content": resposta_ia})
+                    
                 except Exception as e:
-                    erro_msg = f"Erro no pipeline de IA: {e}"
-                    st.error(erro_msg)
-                    st.session_state.mensagens_duvidas.append({"role": "assistant", "content": erro_msg})
+                    st.error(f"Erro na consulta: {e}")
