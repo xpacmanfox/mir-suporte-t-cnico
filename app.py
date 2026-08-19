@@ -92,6 +92,12 @@ if "chats_falhas" not in st.session_state:
 if "chat_atual_falhas" not in st.session_state:
     st.session_state.chat_atual_falhas = 0
 
+# Controle dinâmico para limpar os uploaders forçadamente
+if "uploader_duvida_id" not in st.session_state:
+    st.session_state.uploader_duvida_id = 0
+if "uploader_falha_id" not in st.session_state:
+    st.session_state.uploader_falha_id = 0
+
 # --- SIDEBAR MODERNA ---
 with st.sidebar:
     st.markdown("## 🚆 MIR DESKTOP")
@@ -190,14 +196,19 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
         
     with col_file:
         with st.popover("📷 Print", use_container_width=True):
-            imagem_enviada_duvida = st.file_uploader("Anexar imagem", type=["png", "jpg", "jpeg"], key="uploader_duvida", label_visibility="collapsed")
+            # A chave muda dinamicamente usando o ID da sessão, forçando a limpeza ao resetar
+            imagem_enviada_duvida = st.file_uploader(
+                "Anexar imagem", 
+                type=["png", "jpg", "jpeg"], 
+                key=f"uploader_duvida_{st.session_state.uploader_duvida_id}", 
+                label_visibility="collapsed"
+            )
             if imagem_enviada_duvida:
                 st.success("Imagem pronta! Feche o menu e envie.")
 
     if pergunta:
         conteudo_usuario = []
         
-        # Verifica se há imagem no uploader atual
         if imagem_enviada_duvida is not None:
             img_url = converter_imagem_para_base64(imagem_enviada_duvida)
             conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
@@ -258,9 +269,8 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
                     
-                    # LIMPA O UPLOADER DO ESTADO PARA A IMAGEM SUMIR AUTOMATICAMENTE
-                    if "uploader_duvida" in st.session_state:
-                        del st.session_state["uploader_duvida"]
+                    # Incrementa o ID do uploader para destruí-lo e limpá-lo nativamente
+                    st.session_state.uploader_duvida_id += 1
                         
                     st.rerun()
                     
@@ -294,14 +304,19 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
         
     with col_file:
         with st.popover("📷 Print", use_container_width=True):
-            imagem_enviada_falha = st.file_uploader("Anexar imagem", type=["png", "jpg", "jpeg"], key="uploader_falha", label_visibility="collapsed")
+            # A chave muda dinamicamente usando o ID da sessão, forçando a limpeza ao resetar
+            imagem_enviada_falha = st.file_uploader(
+                "Anexar imagem", 
+                type=["png", "jpg", "jpeg"], 
+                key=f"uploader_falha_{st.session_state.uploader_falha_id}", 
+                label_visibility="collapsed"
+            )
             if imagem_enviada_falha:
                 st.success("Imagem pronta! Feche o menu e envie.")
 
     if pergunta:
         conteudo_usuario = []
         
-        # Verifica se há imagem no uploader atual
         if imagem_enviada_falha is not None:
             img_url = converter_imagem_para_base64(imagem_enviada_falha)
             conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
@@ -372,9 +387,8 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
                     
-                    # LIMPA O UPLOADER DO ESTADO PARA A IMAGEM SUMIR AUTOMATICAMENTE
-                    if "uploader_falha" in st.session_state:
-                        del st.session_state["uploader_falha"]
+                    # Incrementa o ID do uploader para destruí-lo e limpá-lo nativamente
+                    st.session_state.uploader_falha_id += 1
                         
                     st.rerun()
                 except Exception as e:
