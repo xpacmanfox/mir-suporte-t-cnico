@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 import pypdf
 
-# Configuração da página do Streamlit (Deve ser a primeira chamada do Streamlit)
+# Configuração da página do Streamlit
 st.set_page_config(
     page_title="Mir - Suporte Técnico Virtual (Ferroviário)",
     page_icon="🚆",
@@ -18,7 +18,7 @@ st.set_page_config(
 PASTA_BASE_MANUAIS = Path("./Docs")
 PASTA_BASE_MANUAIS.mkdir(exist_ok=True)
 
-# Inicialização dos componentes de IA (com cache para otimizar o carregamento)
+# Inicialização dos componentes de IA (com cache)
 @st.cache_resource
 def carregar_componentes_ia():
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
@@ -40,8 +40,6 @@ def indexar_arquivo(caminho_arquivo):
     """Indexa um arquivo PDF extraindo seu texto e salvando na collection."""
     try:
         nome_arq = caminho_arquivo.name
-        
-        # Remove entradas antigas para evitar duplicidade
         existing = collection.get(where={"source": nome_arq})
         if existing and len(existing.get('ids', [])) > 0:
             collection.delete(where={"source": nome_arq})
@@ -108,7 +106,6 @@ with st.sidebar:
 
     st.divider()
     
-    # Histórico de conversas baseado na aba ativa
     if aba_selecionada == "📖 Dúvidas Técnicas":
         st.markdown("### 🕒 Histórico de Dúvidas")
         if st.button("➕ Novo Chat de Dúvidas", use_container_width=True):
@@ -175,7 +172,6 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
     chat_idx = st.session_state.chat_atual_duvidas
     chat_atual = st.session_state.chats_duvidas[chat_idx]
 
-    # Exibir histórico
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
             if isinstance(msg["content"], list):
@@ -187,11 +183,14 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
             else:
                 st.markdown(msg["content"])
 
-    # Área para envio opcional de imagem
-    with st.expander("📎 Anexar imagem para esta mensagem (Opcional)"):
-        imagem_enviada_duvida = st.file_uploader("Escolha uma imagem", type=["png", "jpg", "jpeg"], key="uploader_duvida")
+    # Layout limpo: Input de texto e botão de arquivo lado a lado na parte inferior
+    col_input, col_file = st.columns([0.88, 0.12])
+    with col_input:
+        pergunta = st.chat_input("Qual dúvida técnica você tem hoje?", key="input_duvida")
+    with col_file:
+        imagem_enviada_duvida = st.file_uploader("📷", type=["png", "jpg", "jpeg"], key="uploader_duvida", label_visibility="collapsed")
 
-    if pergunta := st.chat_input("Qual dúvida técnica você tem hoje?"):
+    if pergunta:
         conteudo_usuario = []
         
         if imagem_enviada_duvida is not None:
@@ -211,7 +210,7 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
-            with st.spinner("Realizando busca profunda nos manuais e analisando dados..."):
+            with st.spinner("Realizando busca profunda nos manuais..."):
                 try:
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
                     resultados = collection.query(query_embeddings=pergunta_vetor, n_results=12)
@@ -224,11 +223,19 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
                     
                     system_prompt = (
-                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada no contexto fornecido e em inspeções visuais se houver imagem.\n"
+                        "Você é o Mir, o especialista sênior em manutenção ferroviária. Sua resposta deve ser técnica, direta e baseada no contexto fornecido.\n"
+                        "Você deve procurar qualquer vestígio do assunto nos arquivos da base de dados, caso não encontre pode procurar na internet, porém sem inventar dados ou valores.\n"
+                        "Sua função principal é atuar como um consultor técnico de suporte, respondendo a dúvidas, "
+                        "explicando conceitos e detalhando especificações **com base estrita nos manuais e documentos indexados na base de dados**.\n\n"
+                        
+                        "DIRETRIZES DE ATUAÇÃO:\n"
+                        "1. **Fidelidade ao Contexto:** Utilize os trechos dos manuais fornecidos abaixo como sua fonte primária de verdade técnica.\n"
+                        "2. **Clareza e Estrutura:** Explique os conceitos de forma didática, organizada em tópicos (bullet points) ou passos, facilitando o entendimento de operadores, técnicos ou engenheiros.\n"
+                        "3. **Transparência em Caso de Omissão:** Se a resposta exata não constar nos trechos fornecidos, informe educadamente: 'Com base na documentação atualmente indexada, não encontrei detalhes específicos sobre este ponto'. Em seguida, se for seguro e parte de boas práticas ferroviárias gerais, ofereça uma orientação técnica complementar, mas **sempre ressalvando** que se trata de uma recomendação geral e não de uma norma oficial do documento.\n"
+                        "4. **Citação de Fontes:** Sempre que utilizar informações técnicas, parâmetros, limites ou procedimentos dos trechos.\n\n"
                         f"CONTEXTO EXTRAÍDO:\n{contexto}"
                     )
 
-                    # Prepara mensagens para OpenAI (suporta texto + imagem)
                     messages_payload = [{"role": "system", "content": system_prompt}]
                     for m in chat_atual["mensagens"]:
                         messages_payload.append({"role": m["role"], "content": m["content"]})
@@ -242,6 +249,7 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    st.rerun() # Recarrega a página para limpar a imagem enviada do uploader
                     
                 except Exception as e:
                     erro_msg = f"Erro na consulta: {e}"
@@ -255,7 +263,6 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
     chat_idx = st.session_state.chat_atual_falhas
     chat_atual = st.session_state.chats_falhas[chat_idx]
 
-    # Exibir histórico
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
             if isinstance(msg["content"], list):
@@ -267,11 +274,14 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
             else:
                 st.markdown(msg["content"])
 
-    # Área para envio opcional de imagem
-    with st.expander("📎 Anexar tela de falha, parâmetros ou foto de componente (Opcional)"):
-        imagem_enviada_falha = st.file_uploader("Escolha uma imagem", type=["png", "jpg", "jpeg"], key="uploader_falha")
+    # Layout limpo: Input de texto e botão de arquivo lado a lado na parte inferior
+    col_input, col_file = st.columns([0.88, 0.12])
+    with col_input:
+        pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
+    with col_file:
+        imagem_enviada_falha = st.file_uploader("📷", type=["png", "jpg", "jpeg"], key="uploader_falha", label_visibility="collapsed")
 
-    if pergunta := st.chat_input("Descreva o equipamento, sistema e sintomas da falha..."):
+    if pergunta:
         conteudo_usuario = []
         
         if imagem_enviada_falha is not None:
@@ -310,16 +320,16 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF local indexado para citação."
 
                     system_prompt = (
-                        "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII).\n"
+                       "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII).\n"
                         "Sua linguagem é técnica, direta e prática, voltada para profissionais de oficina (mecânicos e eletricistas).\n\n"
                         "DIRETRIZES DE RESPOSTA:\n"
-                        "1. ANÁLISE DE DADOS E IMAGENS: Sempre analise as variáveis (MR, BP, ER, BC, etc.) e o conteúdo da imagem anexada antes de dar o diagnóstico. Explique o porquê de cada valor ser relevante.\n"
-                        "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum (ex: 1106 = ERCP/13CP), comece por ela.\n"
+                        "1. ANÁLISE DE DADOS E IMAGENS: Sempre pergunte sobre as variáveis, e analise-as após serem enviadas.\n"
+                        "2. CONTEXTUALIZAÇÃO: Se o código de erro tem uma causa raiz comum, comece por ela.\n"
                         "3. HIPÓTESES PRIORIZADAS: Liste as causas em ordem de probabilidade.\n"
                         "4. AÇÃO PRÁTICA: O que o técnico deve fazer AGORA na oficina?\n\n"
                         "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
                         "### 🔎 Interpretação do Evento\n"
-                        "### 📊 Análise das Pressões / Imagem\n"
+                        "### 📊 Análise das variáveis / Imagem\n"
                         "### 💡 Minha Hipótese de Diagnóstico\n"
                         "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
                         f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
@@ -338,6 +348,7 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    st.rerun() # Recarrega a página para limpar a imagem enviada do uploader
                 except Exception as e:
                     erro_msg = f"Erro no pipeline de IA: {e}"
                     st.error(erro_msg)
