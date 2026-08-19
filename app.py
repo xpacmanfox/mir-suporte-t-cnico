@@ -88,6 +88,21 @@ with st.sidebar:
         "Navegação",
         ["💬 Dúvidas", "⚙️ Análise de Falhas", "📂 Adicionar Conhecimento"],
         label_visibility="collapsed"
+st.divider()
+    if st.button("🗑️ Excluir Todos os PDFs da Pasta Docs", use_container_width=True, type="secondary"):
+        try:
+            arquivos_docs = list(PASTA_BASE_MANUAIS.glob("**/*.pdf"))
+            for arq in arquivos_docs:
+                arq.unlink() # Deleta o arquivo físico
+            
+            # Limpa também a base vetorial para sincronizar
+            chroma_client.delete_collection("mir_suporte_tecnico")
+            collection = chroma_client.get_or_create_collection(name="mir_suporte_tecnico")
+            
+            st.success("Todos os manuais e a base vetorial foram limpos com sucesso!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao limpar os arquivos: {e}")
     )
 
     st.divider()
