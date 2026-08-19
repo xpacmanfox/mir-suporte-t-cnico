@@ -164,8 +164,22 @@ with st.sidebar:
 if aba_selecionada == "📖 Dúvidas Técnicas":
     st.markdown("### 📖 Dúvidas Técnicas e Consultas")
     
+    # Recupera o chat atual de dúvidas
+    chat_idx = st.session_state.chat_atual_duvidas
+    chat_atual = st.session_state.chats_duvidas[chat_idx]
+
+    # Exibir histórico de conversas do chat ativo
+    for msg in chat_atual["mensagens"]:
+        with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
+            st.markdown(msg["content"])
+    
     if pergunta := st.chat_input("Qual dúvida técnica você tem hoje?"):
-        st.session_state.mensagens_duvidas.append({"role": "user", "content": pergunta})
+        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
+        
+        # Atualiza o título do chat dinamicamente se for o primeiro termo
+        if chat_atual["titulo"].startswith("Nova Dúvida") or chat_atual["titulo"].startswith("Dúvida"):
+            chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
+
         with st.chat_message("user", avatar="👤"):
             st.markdown(pergunta)
 
@@ -178,12 +192,12 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     
                     contexto_partes = []
                     fontes_encontradas = set()
-                    if resultados and resultados["documents"]:
+                    if resultados and resultados["documents"] and resultados["documents"][0]:
                         for doc, meta in zip(resultados["documents"][0], resultados["metadatas"][0]):
                             contexto_partes.append(f"Fonte: {meta.get('source', 'Desconhecido')} | Conteúdo: {doc}")
                             fontes_encontradas.add(meta.get('source', 'Manual'))
                     
-                    contexto = "\n\n".join(contexto_partes)
+                    contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
                     
                     # Prompt Refinado (Mais autoridade e rigor)
                     system_prompt = (
@@ -207,10 +221,12 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
-                    st.session_state.mensagens_duvidas.append({"role": "assistant", "content": resposta_ia})
+                    chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
                     
                 except Exception as e:
-                    st.error(f"Erro na consulta: {e}")
+                    erro_msg = f"Erro na consulta: {e}"
+                    st.error(erro_msg)
+                    chat_atual["mensagens"].append({"role": "assistant", "content": erro_msg})
 
 # --- ABA 2: ANÁLISE DE FALHAS ---
 elif aba_selecionada == "⚙️ Análise de Falhas":
