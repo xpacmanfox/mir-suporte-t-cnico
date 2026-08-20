@@ -1,4 +1,5 @@
 import os
+import base64
 from pathlib import Path
 import streamlit as st
 import chromadb
@@ -65,6 +66,13 @@ def indexar_arquivo(caminho_arquivo):
         print(f"Erro ao indexar {caminho_arquivo}: {e}")
         return False
 
+def converter_imagem_para_base64(uploaded_file):
+    """Converte arquivo de imagem enviado pelo Streamlit para string base64."""
+    bytes_data = uploaded_file.getvalue()
+    encoded = base64.b64encode(bytes_data).decode("utf-8")
+    extensao = uploaded_file.type.split("/")[-1]
+    return f"data:image/{extensao};base64,{encoded}"
+
 # --- GESTÃO DE SESSÕES E HISTÓRICO DE CHATS ---
 if "chats_duvidas" not in st.session_state:
     st.session_state.chats_duvidas = [{
@@ -83,6 +91,12 @@ if "chats_falhas" not in st.session_state:
     }]
 if "chat_atual_falhas" not in st.session_state:
     st.session_state.chat_atual_falhas = 0
+
+# Controle dinâmico para limpar os uploaders forçadamente
+if "uploader_duvida_id" not in st.session_state:
+    st.session_state.uploader_duvida_id = 0
+if "uploader_falha_id" not in st.session_state:
+    st.session_state.uploader_falha_id = 0
 
 # --- SIDEBAR MODERNA ---
 with st.sidebar:
@@ -166,17 +180,49 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
 
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            st.markdown(msg["content"])
+            if isinstance(msg["content"], list):
+                for item in msg["content"]:
+                    if item.get("type") == "text":
+                        st.markdown(item["text"])
+                    elif item.get("type") == "image_url":
+                        st.image(item["image_url"]["url"], width=300)
+            else:
+                st.markdown(msg["content"])
 
-    pergunta = st.chat_input("Qual dúvida técnica você tem hoje?", key="input_duvida")
+    col_input, col_file = st.columns([0.88, 0.12], vertical_alignment="bottom")
+    
+    with col_input:
+        pergunta = st.chat_input("Qual dúvida técnica você tem hoje?", key="input_duvida")
+        
+    with col_file:
+        with st.popover("📷 Print", use_container_width=True):
+            # A chave muda dinamicamente usando o ID da sessão, forçando a limpeza ao resetar
+            imagem_enviada_duvida = st.file_uploader(
+                "Anexar imagem", 
+                type=["png", "jpg", "jpeg"], 
+                key=f"uploader_duvida_{st.session_state.uploader_duvida_id}", 
+                label_visibility="collapsed"
+            )
+            if imagem_enviada_duvida:
+                st.success("Imagem pronta! Feche o menu e envie.")
 
     if pergunta:
-        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
+        conteudo_usuario = []
+        
+        if imagem_enviada_duvida is not None:
+            img_url = converter_imagem_para_base64(imagem_enviada_duvida)
+            conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
+        
+        conteudo_usuario.append({"type": "text", "text": pergunta})
+
+        chat_atual["mensagens"].append({"role": "user", "content": conteudo_usuario})
         
         if chat_atual["titulo"].startswith("Nova Dúvida") or chat_atual["titulo"].startswith("Dúvida"):
             chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
 
         with st.chat_message("user", avatar="👤"):
+            if imagem_enviada_duvida is not None:
+                st.image(imagem_enviada_duvida, width=300)
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
@@ -206,7 +252,10 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
 
                     messages_payload = [{"role": "system", "content": system_prompt}]
                     for m in chat_atual["mensagens"][:-1]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
+                        texto_limpo = m["content"]
+                        if isinstance(texto_limpo, list):
+                            texto_limpo = next((item["text"] for item in texto_limpo if item.get("type") == "text"), "")
+                        messages_payload.append({"role": m["role"], "content": texto_limpo})
                     
                     messages_payload.append({"role": "user", "content": chat_atual["mensagens"][-1]["content"]})
 
@@ -219,6 +268,10 @@ if aba_selecionada == "📖 Dúvidas Técnicas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    
+                    # Incrementa o ID do uploader para destruí-lo e limpá-lo nativamente
+                    st.session_state.uploader_duvida_id += 1
+                        
                     st.rerun()
                     
                 except Exception as e:
@@ -235,17 +288,49 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
 
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
-            st.markdown(msg["content"])
+            if isinstance(msg["content"], list):
+                for item in msg["content"]:
+                    if item.get("type") == "text":
+                        st.markdown(item["text"])
+                    elif item.get("type") == "image_url":
+                        st.image(item["image_url"]["url"], width=300)
+            else:
+                st.markdown(msg["content"])
 
-    pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
+    col_input, col_file = st.columns([0.88, 0.12], vertical_alignment="bottom")
+    
+    with col_input:
+        pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
+        
+    with col_file:
+        with st.popover("📷 Print", use_container_width=True):
+            # A chave muda dinamicamente usando o ID da sessão, forçando a limpeza ao resetar
+            imagem_enviada_falha = st.file_uploader(
+                "Anexar imagem", 
+                type=["png", "jpg", "jpeg"], 
+                key=f"uploader_falha_{st.session_state.uploader_falha_id}", 
+                label_visibility="collapsed"
+            )
+            if imagem_enviada_falha:
+                st.success("Imagem pronta! Feche o menu e envie.")
 
     if pergunta:
-        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
+        conteudo_usuario = []
+        
+        if imagem_enviada_falha is not None:
+            img_url = converter_imagem_para_base64(imagem_enviada_falha)
+            conteudo_usuario.append({"type": "image_url", "image_url": {"url": img_url}})
+        
+        conteudo_usuario.append({"type": "text", "text": pergunta})
+
+        chat_atual["mensagens"].append({"role": "user", "content": conteudo_usuario})
         
         if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
             chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
 
         with st.chat_message("user", avatar="👤"):
+            if imagem_enviada_falha is not None:
+                st.image(imagem_enviada_falha, width=300)
             st.markdown(pergunta)
 
         with st.chat_message("assistant", avatar="🔹"):
@@ -271,13 +356,13 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                         "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII e elétrica ferroviária).\n"
                         "Sua linguagem é técnica, direta, prática e corporativa de oficina (voltada para mecânicos e eletricistas).\n\n"
                         "DIRETRIZES DE RESPOSTA:\n"
-                        "1. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente. Caso faltem informações essenciais, aponte o que falta.\n"
+                        "1. ANÁLISE DE DADOS E IMAGENS: Se o usuário enviou uma imagem ou texto com pressões (MR, BP, ER, BC), analise detalhadamente. Caso faltem informações essenciais, aponte o que falta.\n"
                         "2. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente, comece por ela.\n"
                         "3. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
                         "4. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
                         "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
                         "### 🔎 Interpretação do Evento\n"
-                        "### 📊 Análise das Variáveis\n"
+                        "### 📊 Análise das Variáveis / Imagem\n"
                         "### 💡 Minha Hipótese de Diagnóstico\n"
                         "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
                         f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
@@ -286,7 +371,10 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
 
                     messages_payload = [{"role": "system", "content": system_prompt}]
                     for m in chat_atual["mensagens"][:-1]:
-                        messages_payload.append({"role": m["role"], "content": m["content"]})
+                        texto_limpo = m["content"]
+                        if isinstance(texto_limpo, list):
+                            texto_limpo = next((item["text"] for item in texto_limpo if item.get("type") == "text"), "")
+                        messages_payload.append({"role": m["role"], "content": texto_limpo})
                     
                     messages_payload.append({"role": "user", "content": chat_atual["mensagens"][-1]["content"]})
 
@@ -298,6 +386,10 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                     resposta_ia = response.choices[0].message.content
                     st.markdown(resposta_ia)
                     chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    
+                    # Incrementa o ID do uploader para destruí-lo e limpá-lo nativamente
+                    st.session_state.uploader_falha_id += 1
+                        
                     st.rerun()
                 except Exception as e:
                     erro_msg = f"Erro no pipeline de IA: {e}"
