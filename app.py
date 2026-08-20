@@ -79,7 +79,7 @@ if "chats_falhas" not in st.session_state:
     st.session_state.chats_falhas = [{
         "id": 1, 
         "titulo": "Nova Falha", 
-        "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Estou pronto para auxiliar técnicos, mecânicos, eletricistas, inspetores e engenheiros. Descreva a falha ou anomalia observada."}]
+        "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Estou pronto para auxiliar técnicos, mecânicos, eletricistas, inspetores e engenheiros. Descreva a falha observada (já mencionando o modelo da locomotiva, se possível)."}]
     }]
 if "chat_atual_falhas" not in st.session_state:
     st.session_state.chat_atual_falhas = 0
@@ -237,7 +237,7 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
             st.markdown(msg["content"])
 
-    pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
+    pergunta = st.chat_input("Descreva o equipamento, sistema e modelo da locomotiva...", key="input_falha")
 
     if pergunta:
         chat_atual["mensagens"].append({"role": "user", "content": pergunta})
@@ -251,7 +251,11 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
         with st.chat_message("assistant", avatar="🔹"):
             with st.spinner("Analisando falha, parâmetros e manuais..."):
                 try:
+                    # Passo 1: Usa uma chamada rápida ao LLM ou extração por embedding para identificar se há menção de modelo na frase do usuário
+                    # Aqui deixamos a busca vetorial inteligente extrair os trechos mais relevantes com base em todo o texto enviado.
                     pergunta_vetor = encoder.encode([pergunta]).tolist()
+                    
+                    # Realiza a busca no ChromaDB
                     resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
                     
                     contexto_partes = []
@@ -271,12 +275,10 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                         "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII e elétrica ferroviária).\n"
                         "Sua linguagem é técnica, direta, prática e corporativa de oficina (voltada para mecânicos e eletricistas).\n\n"
                         "DIRETRIZES DE RESPOSTA:\n"
-
-                        "1. ANÁLISE DO AGENTE: Pequeno resumo da falha analisado, com breve diagnóstico.\n"
-                        "2. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente.\n"
-                        "3. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente, comece por ela.\n"
-                        "4. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
-                        "5. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
+                        "1. IDENTIFICAÇÃO DO MODELO: Preste muita atenção se o usuário citou o modelo da locomotiva na pergunta (ex: AC44, Dash-9, SD70). Se tiver citado, filtre mentalmente e baseie sua resposta nas especificações daquele modelo presentes no contexto.\n"
+                        "2. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente. Caso faltem informações essenciais, aponte o que falta e lembre o usuário de informar o modelo caso não o tenha feito.\n"
+                        "3. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
+                        "4. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
                         "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
                         "### 🔎 Interpretação do Evento\n"
                         "### 📊 Análise das Variáveis\n"
