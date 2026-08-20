@@ -8,10 +8,30 @@ import pypdf
 
 # Configuração da página do Streamlit
 st.set_page_config(
-    page_title="Mir - Suporte Técnico Virtual (Ferroviário)",
+    page_title="Mir - Suporte Técnico Virtual (Locomotiva)",
     page_icon="🚆",
     layout="wide"
 )
+
+# --- CSS CUSTOMIZADO PARA AUMENTAR AS FONTES ---
+st.markdown("""
+    <style>
+        /* Aumenta a fonte do menu lateral (sidebar) */
+        section[data-testid="stSidebar"] * {
+            font-size: 16px !important;
+        }
+        
+        /* Aumenta a fonte das mensagens do chat (tanto usuário quanto assistente) */
+        .stChatMessage * {
+            font-size: 17px !important;
+        }
+        
+        /* Aumenta a fonte do campo de texto (chat input) */
+        .stChatInput textarea {
+            font-size: 16px !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- Configuração de Pastas ---
 PASTA_BASE_MANUAIS = Path("./Docs")
@@ -86,7 +106,7 @@ if "chat_atual_falhas" not in st.session_state:
 
 # --- SIDEBAR MODERNA ---
 with st.sidebar:
-    st.markdown("## 🚆 MIR DESKTOP")
+    st.markdown("## 🚆 MIR - Locomotivas")
     st.caption("Inteligência em Manutenção")
     st.divider()
 
