@@ -79,10 +79,7 @@ if "chats_falhas" not in st.session_state:
     st.session_state.chats_falhas = [{
         "id": 1, 
         "titulo": "Nova Falha", 
-        "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Descreva a falha ou anomalia observada."}],
-        "aguardando_modelo": False,
-        "sintoma_temporario": "",
-        "modelo_locomotiva": ""
+        "mensagens": [{"role": "assistant", "content": "Olá. Sou o agente especialista em manutenção ferroviária. Estou pronto para auxiliar técnicos, mecânicos, eletricistas, inspetores e engenheiros. Descreva a falha ou anomalia observada."}]
     }]
 if "chat_atual_falhas" not in st.session_state:
     st.session_state.chat_atual_falhas = 0
@@ -133,10 +130,7 @@ with st.sidebar:
             st.session_state.chats_falhas.append({
                 "id": novo_id, 
                 "titulo": f"Falha {novo_id}", 
-                "mensagens": [{"role": "assistant", "content": "Descreva a nova ocorrência ou falha observada."}],
-                "aguardando_modelo": False,
-                "sintoma_temporario": "",
-                "modelo_locomotiva": ""
+                "mensagens": [{"role": "assistant", "content": "Descreva a nova ocorrência ou falha observada."}]
             })
             st.session_state.chat_atual_falhas = len(st.session_state.chats_falhas) - 1
             st.rerun()
@@ -239,14 +233,6 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
     chat_idx = st.session_state.chat_atual_falhas
     chat_atual = st.session_state.chats_falhas[chat_idx]
 
-    # Garante chaves de controle no dicionário do chat atual
-    if "aguardando_modelo" not in chat_atual:
-        chat_atual["aguardando_modelo"] = False
-    if "sintoma_temporario" not in chat_atual:
-        chat_atual["sintoma_temporario"] = ""
-    if "modelo_locomotiva" not in chat_atual:
-        chat_atual["modelo_locomotiva"] = ""
-
     for msg in chat_atual["mensagens"]:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user", avatar="🔹" if msg["role"] == "assistant" else "👤"):
             st.markdown(msg["content"])
@@ -254,102 +240,71 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
     pergunta = st.chat_input("Descreva o equipamento, sistema e sintomas da falha...", key="input_falha")
 
     if pergunta:
+        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
+        
+        if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
+            chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
+
         with st.chat_message("user", avatar="👤"):
             st.markdown(pergunta)
 
-        chat_atual["mensagens"].append({"role": "user", "content": pergunta})
+        with st.chat_message("assistant", avatar="🔹"):
+            with st.spinner("Analisando falha, parâmetros e manuais..."):
+                try:
+                    pergunta_vetor = encoder.encode([pergunta]).tolist()
+                    resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
+                    
+                    contexto_partes = []
+                    fontes_encontradas = set()
+                    if resultados and resultados["documents"] and resultados["documents"][0]:
+                        docs = resultados["documents"][0]
+                        metas = resultados["metadatas"][0] if resultados.get("metadatas") else [{}] * len(docs)
+                        for doc, meta in zip(docs, metas):
+                            contexto_partes.append(doc)
+                            if meta and "source" in meta:
+                                fontes_encontradas.add(meta["source"])
+                    
+                    contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado na base de PDFs local."
+                    fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF local indexado para citação."
 
-        # CASO 1: O sistema estava aguardando o usuário informar o modelo da locomotiva
-        if chat_atual["aguardando_modelo"]:
-            chat_atual["modelo_locomotiva"] = pergunta
-            chat_atual["aguardando_modelo"] = False
-            
-            sintoma_original = chat_atual["sintoma_temporario"]
-            modelo_informado = pergunta
-            
-            if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
-                chat_atual["titulo"] = f"{modelo_informado}: {sintoma_original[:15]}..."
+                    system_prompt = (
+                        "Você é o Mir, um técnico especialista sênior em manutenção de locomotivas (especialmente sistemas de freio CCBII e elétrica ferroviária).\n"
+                        "Sua linguagem é técnica, direta, prática e corporativa de oficina (voltada para mecânicos e eletricistas).\n\n"
+                        "DIRETRIZES DE RESPOSTA:\n"
 
-            with st.chat_message("assistant", avatar="🔹"):
-                with st.spinner(f"Analisando falha para o modelo {modelo_informado} nos manuais..."):
-                    try:
-                        # Busca semântica combinando sintoma e modelo, focando no nome do arquivo
-                        termo_busca = f"{modelo_informado} {sintoma_original}"
-                        pergunta_vetor = encoder.encode([termo_busca]).tolist()
-                        
-                        # Filtra no ChromaDB por documentos cujo nome contenha o modelo informado
-                        resultados = collection.query(
-                            query_embeddings=pergunta_vetor, 
-                            n_results=6,
-                            where={"source": {"$contains": modelo_informado}}
-                        )
-                        
-                        # Se o filtro restrito não retornar nada, tenta uma busca geral sem o filtro exato para não deixar o usuário sem resposta
-                        if not resultados or not resultados["documents"] or not resultados["documents"][0]:
-                            resultados = collection.query(query_embeddings=pergunta_vetor, n_results=6)
+                        "1. ANÁLISE DO AGENTE: Pequeno resumo da falha analisado, com breve diagnóstico.\n"
+                        "2. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente.\n"
+                        "3. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente, comece por ela.\n"
+                        "4. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
+                        "5. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
+                        "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
+                        "### 🔎 Interpretação do Evento\n"
+                        "### 📊 Análise das Variáveis\n"
+                        "### 💡 Minha Hipótese de Diagnóstico\n"
+                        "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
+                        f"Contexto técnico extraído dos manuais locais:\n{contexto}\n\n"
+                        f"Fontes/Documentos disponíveis para referência: {fontes_str}"
+                    )
 
-                        contexto_partes = []
-                        fontes_encontradas = set()
-                        if resultados and resultados["documents"] and resultados["documents"][0]:
-                            docs = resultados["documents"][0]
-                            metas = resultados["metadatas"][0] if resultados.get("metadatas") else [{}] * len(docs)
-                            for doc, meta in zip(docs, metas):
-                                contexto_partes.append(doc)
-                                if meta and "source" in meta:
-                                    fontes_encontradas.add(meta["source"])
-                        
-                        contexto = "\n\n".join(contexto_partes) if contexto_partes else "Nenhum trecho correspondente encontrado."
-                        fontes_str = ", ".join(fontes_encontradas) if fontes_encontradas else "Nenhum manual PDF indexado."
+                    messages_payload = [{"role": "system", "content": system_prompt}]
+                    for m in chat_atual["mensagens"][:-1]:
+                        messages_payload.append({"role": m["role"], "content": m["content"]})
+                    
+                    messages_payload.append({"role": "user", "content": chat_atual["mensagens"][-1]["content"]})
 
-                        system_prompt = (
-                            f"Você é o Mir, um técnico especialista sênior em manutenção de locomotivas focando no modelo: {modelo_informado}.\n"
-                            "Sua linguagem é técnica, direta, prática e corporativa de oficina (voltada para mecânicos e eletricistas).\n\n"
-                            "DIRETRIZES DE RESPOSTA:\n"
-                            "1. ANÁLISE DE DADOS: Analise os sintomas informados considerando as características técnicas específicas deste modelo.\n"
-                            "2. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente para esta máquina, comece por ela.\n"
-                            "3. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
-                            "4. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
-                            "ESTRUTURA OBRIGATÓRIA DA RESPOSTA:\n"
-                            "### 🔎 Interpretação do Evento\n"
-                            "### 📊 Análise das Variáveis\n"
-                            "### 💡 Minha Hipótese de Diagnóstico\n"
-                            "### 🛠️ Plano de Ação (Checklist de Oficina)\n\n"
-                            f"Contexto técnico extraído dos manuais do modelo {modelo_informado}:\n{contexto}\n\n"
-                            f"Fontes/Documentos utilizados: {fontes_str}"
-                        )
-
-                        messages_payload = [{"role": "system", "content": system_prompt}]
-                        messages_payload.append({"role": "user", "content": f"Modelo da Locomotiva: {modelo_informado}\nSintoma/Falha Relatada: {sintoma_original}"})
-
-                        response = client.chat.completions.create(
-                            model="openai/gpt-4o-mini",
-                            messages=messages_payload,
-                            temperature=0.1
-                        )
-                        resposta_ia = response.choices[0].message.content
-                        st.markdown(resposta_ia)
-                        chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
-                        st.rerun()
-                    except Exception as e:
-                        erro_msg = f"Erro no pipeline de IA: {e}"
-                        st.error(erro_msg)
-                        chat_atual["mensagens"].append({"role": "assistant", "content": erro_msg})
-
-        # CASO 2: Primeira mensagem de falha enviada, agora o sistema pergunta o modelo ativamente
-        else:
-            chat_atual["sintoma_temporario"] = pergunta
-            chat_atual["aguardando_modelo"] = True
-            
-            if chat_atual["titulo"].startswith("Nova Falha") or chat_atual["titulo"].startswith("Falha"):
-                chat_atual["titulo"] = pergunta[:25] + "..." if len(pergunta) > 25 else pergunta
-
-            resposta_modelo = "Entendido. Para direcionar corretamente a análise nos manuais específicos, **qual é o modelo da locomotiva**? (Ex: AC44, Dash-9, SD70, etc.)"
-            
-            with st.chat_message("assistant", avatar="🔹"):
-                st.markdown(resposta_modelo)
-            
-            chat_atual["mensagens"].append({"role": "assistant", "content": resposta_modelo})
-            st.rerun()
+                    response = client.chat.completions.create(
+                        model="openai/gpt-4o-mini",
+                        messages=messages_payload,
+                        temperature=0.1
+                    )
+                    resposta_ia = response.choices[0].message.content
+                    st.markdown(resposta_ia)
+                    chat_atual["mensagens"].append({"role": "assistant", "content": resposta_ia})
+                    st.rerun()
+                except Exception as e:
+                    erro_msg = f"Erro no pipeline de IA: {e}"
+                    st.error(erro_msg)
+                    chat_atual["mensagens"].append({"role": "assistant", "content": erro_msg})
 
 # --- ABA 3: ADICIONAR CONHECIMENTO ---
 elif aba_selecionada == "📂 Adicionar Conhecimento":
