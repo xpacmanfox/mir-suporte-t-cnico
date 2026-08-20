@@ -273,7 +273,7 @@ elif aba_selecionada == "⚙️ Análise de Falhas":
                         "DIRETRIZES DE RESPOSTA:\n"
 
                         "1. ANÁLISE DO AGENTE: Pequeno resumo da falha analisado, com breve diagnóstico.\n"
-                        "2. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente. Caso faltem informações essenciais, aponte o que falta.\n"
+                        "2. ANÁLISE DE DADOS: Se o usuário descreveu parâmetros ou pressões (MR, BP, ER, BC), analise detalhadamente.\n"
                         "3. CONTEXTUALIZAÇÃO: Se o código de erro ou sintoma possui uma causa raiz recorrente, comece por ela.\n"
                         "4. HIPÓTESES PRIORIZADAS: Liste as prováveis causas em ordem decrescente de probabilidade.\n"
                         "5. AÇÃO PRÁTICA: O que o mecânico/eletricista deve fazer AGORA na oficina?\n\n"
