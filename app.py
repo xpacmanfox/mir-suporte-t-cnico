@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CSS CUSTOMIZADO PARA PADRONIZAÇÃO VISUAL ---
+# --- CSS CUSTOMIZADO PARA PADRONIZAÇÃO VISUAL (BOTÕES EM VERMELHO) ---
 st.markdown("""
     <style>
         section[data-testid="stSidebar"] * {
@@ -24,9 +24,20 @@ st.markdown("""
         .stTextInput input {
             font-size: 16px !important;
         }
-        .stButton button {
-            width: 100%;
-            border-radius: 6px;
+        /* Padronização de TODOS os botões para vermelho */
+        .stButton button, div.stLinkButton a {
+            width: 100% !important;
+            background-color: #ff4b4b !important;
+            color: white !important;
+            border-radius: 6px !important;
+            border: none !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+            padding: 0.5rem 1rem !important;
+        }
+        .stButton button:hover, div.stLinkButton a:hover {
+            background-color: #ff2b2b !important;
+            color: white !important;
         }
     </style>
 """, unsafe_allow_html=True)
