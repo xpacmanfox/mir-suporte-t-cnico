@@ -64,30 +64,26 @@ st.sidebar.divider()
 
 menu_opcao = st.sidebar.radio(
     "Escolha o Módulo",
-    [
-        "🚆 Catálogo de Locomotivas (PDF)", 
-        "🛤️ Catálogo de Máquinas de Via (PDF)", 
-        "📋 Código de Materiais (Planilha)"
-    ]
+    ["🔍 Buscador de Peças (PDF)", "📋 Código de Materiais (Planilha)"]
 )
 
 st.sidebar.divider()
 st.sidebar.info("Este aplicativo é dedicado exclusivamente à consulta de catálogos de fornecedores e códigos internos de materiais.")
 
-# --- FUNÇÃO DE BUSCA E GERENCIAMENTO DE CATÁLOGOS EM PDF ---
-def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
-    st.title(titulo_modulo)
+# --- MÓDULO 1: BUSCADOR DE PEÇAS EM CATÁLOGOS (PDF) ---
+if menu_opcao == "🔍 Buscador de Peças (PDF)":
+    st.title("🔍 Buscador de Peças em Catálogos (PDF)")
     st.markdown("Consulte peças, descrições e Part Numbers diretamente nos catálogos de fornecedores carregados na base.")
     
-    pasta_catalogo = Path(pasta_destino)
-    pasta_catalogo.mkdir(exist_ok=True, parents=True)
+    pasta_catalogo = Path("./Docs_Catalogos")
+    pasta_catalogo.mkdir(exist_ok=True)
     
-    aba_cat = st.radio("Navegação Catálogo", ["🔍 Realizar Busca", "📂 Gerenciar Base de PDFs"], horizontal=True, key=f"radio_{pasta_destino}")
+    aba_cat = st.radio("Navegação Catálogo", ["🔍 Realizar Busca", "📂 Gerenciar Base de PDFs"], horizontal=True)
     
     if aba_cat == "🔍 Realizar Busca":
-        termo_busca = st.text_input("Digite o nome da peça, descrição ou Part Number:", key=f"input_{pasta_destino}")
+        termo_busca = st.text_input("Digite o nome da peça, descrição ou Part Number:")
         
-        if st.button("Buscar no Catálogo", type="primary", key=f"btn_busca_{pasta_destino}"):
+        if st.button("Buscar no Catálogo", type="primary"):
             if not termo_busca:
                 st.warning("Por favor, digite um termo para buscar.")
             else:
@@ -98,13 +94,13 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
                     else:
                         contexto_partes = []
                         for pdf_path in arquivos_pdf:
-                            nome_modelo = pdf_path.stem.replace("_", " ").replace("-", " ")
+                            nome_modelo_maquina = pdf_path.stem.replace("_", " ").replace("-", " ")
                             try:
                                 reader = pypdf.PdfReader(str(pdf_path))
                                 for i, page in enumerate(reader.pages):
                                     texto = page.extract_text()
                                     if texto and termo_busca.lower() in texto.lower():
-                                        contexto_partes.append(f"--- Equipamento/Arquivo: {nome_modelo} | Página: {i+1} ---\n{texto[:1200]}")
+                                        contexto_partes.append(f"--- Modelo/Máquina (Arquivo): {nome_modelo_maquina} | Página: {i+1} ---\n{texto[:1200]}")
                             except Exception as e:
                                 st.warning(f"Não foi possível ler o arquivo '{pdf_path.name}': {e}")
                                 continue
@@ -116,16 +112,16 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
                             
                             prompt_sistema = """
                             Você é um agente especialista em suprimentos, engenharia e peças industriais ferroviárias.
-                            Sua tarefa é analisar os trechos de catálogos fornecidos, identificar **todos** os itens correspondentes à busca do usuário e agrupar separadamente por modelo (cujo nome consta no início de cada trecho do contexto).
+                            Sua tarefa é analisar os trechos de catálogos fornecidos, identificar **todos** os itens correspondentes à busca do usuário e agrupar separadamente por máquina/modelo (cujo nome consta no início de cada trecho do contexto).
                             
-                            Para CADA item encontrado, retorne em um formato limpo, estruturado e fácil de ler (em bullet points ou cards):
-                            - **🚆 Equipamento / Modelo:** [Nome extraído do arquivo]
+                            Para CADA item encontrado, retorne em um formato limpo, estruturado e fácil de ler (em bullet points ou cards por máquina):
+                            - **🚆 Modelo da Máquina / Equipamento:** [Nome extraído do arquivo]
                             - **🔩 Peça / Material:** [Nome claro do item]
                             - **🔢 Part Number / Código:** [Código encontrado no catálogo]
                             - **📄 Página de Referência:** [Número da página]
                             - **📝 Descrição / Detalhes:** [Breve resumo técnico]
                             
-                            Exiba todos os resultados encontrados divididos por modelo. Seja organizado e objetivo.
+                            Exiba todos os resultados encontrados divididos por máquina. Seja organizado e objetivo.
                             """
                             
                             response = client.chat.completions.create(
@@ -136,14 +132,14 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
                                 ],
                                 temperature=0.0
                             )
-                            st.markdown("### 📋 Resultados Encontrados:")
+                            st.markdown("### 📋 Resultados Encontrados por Máquina:")
                             st.markdown(response.choices[0].message.content)
     
     else:
         st.markdown("### 📂 Gerenciamento do Banco de Dados de Catálogos")
-        st.markdown("Faça o upload de novos catálogos em PDF para atualizar a base. **Dica:** Nomeie o arquivo PDF com o modelo correspondente.")
+        st.markdown("Faça o upload de novos catálogos em PDF para atualizar a base de fornecedores. **Dica:** Nomeie o arquivo PDF com o modelo da máquina (ex: `Socadora_Plasser_08_475.pdf`).")
         
-        uploaded_pdfs = st.file_uploader("Carregar novos catálogos (PDF)", type=["pdf"], accept_multiple_files=True, key=f"upload_pdf_{pasta_destino}")
+        uploaded_pdfs = st.file_uploader("Carregar novos catálogos (PDF)", type=["pdf"], accept_multiple_files=True, key="upload_pdf_cat")
         
         if uploaded_pdfs:
             for up_file in uploaded_pdfs:
@@ -159,27 +155,20 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
             for arq in arquivos_atuais:
                 col_p1, col_p2 = st.columns([0.8, 0.2])
                 col_p1.text(f"📄 {arq.name}")
-                if col_p2.button("Excluir", key=f"del_{pasta_destino}_{arq.name}"):
+                if col_p2.button("Excluir", key=f"del_cat_{arq.name}"):
                     arq.unlink()
                     st.success(f"Arquivo {arq.name} removido!")
                     st.rerun()
         else:
             st.info("Nenhum PDF cadastrado no momento.")
 
-# --- Roteamento dos Módulos ---
-if menu_opcao == "🚆 Catálogo de Locomotivas (PDF)":
-    gerenciar_modulo_catalogo("🚆 Catálogo de Peças - Locomotivas", "./Docs_Catalogos_Locomotivas")
-
-elif menu_opcao == "🛤️ Catálogo de Máquinas de Via (PDF)":
-    gerenciar_modulo_catalogo("🛤️ Catálogo de Peças - Máquinas de Via", "./Docs_Catalogos_MaquinasVia")
-
+# --- MÓDULO 2: CÓDIGO DE MATERIAIS (PLANILHA INTERNA) ---
 else:
-    # --- MÓDULO: CÓDIGO DE MATERIAIS (PLANILHA INTERNA) ---
     st.title("📋 Buscador de Código de Materiais (Planilha Interna)")
     st.markdown("Consulte rapidamente os códigos internos de materiais da empresa para requisições e compras.")
     
     pasta_excel = Path("./Docs_Planilhas")
-    pasta_excel.mkdir(exist_ok=True, parents=True)
+    pasta_excel.mkdir(exist_ok=True)
     caminho_excel = pasta_excel / "materiais_internos.xlsx"
     
     aba_mat = st.radio("Navegação Materiais", ["📋 Realizar Consulta", "📂 Gerenciar Planilha de Dados"], horizontal=True)
