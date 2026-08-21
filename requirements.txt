@@ -3,3 +3,11 @@ chromadb
 sentence-transformers
 openai
 pypdf
+torch>=2.0.0
+torchvision>=0.15.0
+langchain
+langchain-community
+langchain-huggingface
+pandas
+openpyxl
+cryptography
