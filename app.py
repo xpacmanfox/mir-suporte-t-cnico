@@ -65,10 +65,11 @@ st.sidebar.divider()
 menu_opcao = st.sidebar.radio(
     "Escolha o Módulo",
     [
-        "🚆 Catálogo de Locomotivas", 
-        "🛤️ Catálogo de Máquinas de Via", 
-        "📋 Código de Materiais"
-    ]
+        "🚆 Catálogo de Locomotivas (PDF)", 
+        "🛤️ Catálogo de Máquinas de Via (PDF)", 
+        "📋 Código de Materiais (Planilha)"
+    ],
+    key="menu_principal_navegacao"
 )
 
 st.sidebar.divider()
@@ -173,7 +174,7 @@ if menu_opcao == "🚆 Catálogo de Locomotivas (PDF)":
 elif menu_opcao == "🛤️ Catálogo de Máquinas de Via (PDF)":
     gerenciar_modulo_catalogo("🛤️ Catálogo de Peças - Máquinas de Via", "./Docs_Catalogos_MaquinasVia")
 
-else:
+elif menu_opcao == "📋 Código de Materiais (Planilha)":
     # --- MÓDULO: CÓDIGO DE MATERIAIS (PLANILHA INTERNA) ---
     st.title("📋 Buscador de Código de Materiais (Planilha Interna)")
     st.markdown("Consulte rapidamente os códigos internos de materiais da empresa para requisições e compras.")
@@ -182,12 +183,12 @@ else:
     pasta_excel.mkdir(exist_ok=True, parents=True)
     caminho_excel = pasta_excel / "materiais_internos.xlsx"
     
-    aba_mat = st.radio("Navegação Materiais", ["📋 Realizar Consulta", "📂 Gerenciar Planilha de Dados"], horizontal=True)
+    aba_mat = st.radio("Navegação Materiais", ["📋 Realizar Consulta", "📂 Gerenciar Planilha de Dados"], horizontal=True, key="radio_materiais_interno")
     
     if aba_mat == "📋 Realizar Consulta":
-        termo_interno = st.text_input("Digite o nome ou código interno do material (ex: Sensor DSS):")
+        termo_interno = st.text_input("Digite o nome ou código interno do material (ex: Sensor DSS):", key="input_termo_material")
         
-        if st.button("Consultar Materiais", type="primary"):
+        if st.button("Consultar Materiais", type="primary", key="btn_consulta_materiais"):
             if not termo_interno:
                 st.warning("Informe um termo para a consulta.")
             else:
