@@ -7,7 +7,7 @@ import pandas as pd
 
 # Configuração da página do Streamlit
 st.set_page_config(
-    page_title="Mir - Central de Gestão e Catálogos",
+    page_title="Mir - Gestão de Catálogos e Materiais",
     page_icon="📦",
     layout="wide"
 )
@@ -31,10 +31,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# Inicializa o estado da escolha do sistema
-if "sistema_ativo" not in st.session_state:
-    st.session_state.sistema_ativo = None
 
 # Configuração da API do OpenRouter / OpenAI
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
@@ -61,12 +57,26 @@ def buscar_materiais(df, termo_busca):
         
     return df[mascara]
 
+# --- MENU LATERAL DE NAVEGAÇÃO ENTRE OS MÓDULOS ---
+st.sidebar.title("📦 Mir - Gestão de Peças")
+st.sidebar.caption("Módulos de Suporte a Suprimentos")
+st.sidebar.divider()
+
+menu_opcao = st.sidebar.radio(
+    "Escolha o Módulo",
+    [
+        "🚆 Catálogo de Locomotivas", 
+        "🛤️ Catálogo de Máquinas de Via", 
+        "📋 Código de Materiais"
+    ],
+    key="menu_principal_navegacao"
+)
+
+st.sidebar.divider()
+st.sidebar.info("Este aplicativo é dedicado exclusivamente à consulta de catálogos de fornecedores e códigos internos de materiais.")
+
 # --- FUNÇÃO DE BUSCA E GERENCIAMENTO DE CATÁLOGOS EM PDF ---
 def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
-    if st.button("🏠 Voltar ao Menu Principal", type="secondary"):
-        st.session_state.sistema_ativo = None
-        st.rerun()
-        
     st.title(titulo_modulo)
     st.markdown("Consulte peças, descrições e Part Numbers diretamente nos catálogos de fornecedores carregados na base.")
     
@@ -157,46 +167,15 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
         else:
             st.info("Nenhum PDF cadastrado no momento.")
 
-
-# --- TELA INICIAL: ESCOLHA DE SISTEMA ---
-if st.session_state.sistema_ativo is None:
-    st.title("📦 MIR - Central de Gestão de Catálogos e Materiais")
-    st.markdown("### Selecione qual sistema você deseja acessar:")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.info("### 🚆 Catálogo de Locomotivas")
-        st.markdown("Busca inteligente de peças e Part Numbers em catálogos em PDF de locomotivas.")
-        if st.button("Acessar Catálogo de Locomotivas", type="primary"):
-            st.session_state.sistema_ativo = "catalogo_locomotivas"
-            st.rerun()
-            
-        st.info("### 🛤️ Catálogo de Máquinas de Via")
-        st.markdown("Busca inteligente de peças e Part Numbers em catálogos de máquinas de via permanente.")
-        if st.button("Acessar Catálogo de Máquinas de Via", type="primary"):
-            st.session_state.sistema_ativo = "catalogo_maquinas_via"
-            st.rerun()        
-            
-    with col2:
-        st.info("### 📋 Código de Materiais")
-        st.markdown("Consulta em planilha com códigos internos da empresa para requisição de materiais.")
-        if st.button("Acessar Código de Materiais", type="primary"):
-            st.session_state.sistema_ativo = "codigo_materiais"
-            st.rerun()
-
-# --- ROTEAMENTO DOS MÓDULOS SELECIONADOS ---
-elif st.session_state.sistema_ativo == "catalogo_locomotivas":
+# --- Roteamento dos Módulos ---
+if menu_opcao == "🚆 Catálogo de Locomotivas (PDF)":
     gerenciar_modulo_catalogo("🚆 Catálogo de Peças - Locomotivas", "./Docs_Catalogos_Locomotivas")
 
-elif st.session_state.sistema_ativo == "catalogo_maquinas_via":
+elif menu_opcao == "🛤️ Catálogo de Máquinas de Via (PDF)":
     gerenciar_modulo_catalogo("🛤️ Catálogo de Peças - Máquinas de Via", "./Docs_Catalogos_MaquinasVia")
 
-elif st.session_state.sistema_ativo == "codigo_materiais":
-    if st.button("🏠 Voltar ao Menu Principal", type="secondary"):
-        st.session_state.sistema_ativo = None
-        st.rerun()
-        
+elif menu_opcao == "📋 Código de Materiais (Planilha)":
+    # --- MÓDULO: CÓDIGO DE MATERIAIS (PLANILHA INTERNA) ---
     st.title("📋 Buscador de Código de Materiais (Planilha Interna)")
     st.markdown("Consulte rapidamente os códigos internos de materiais da empresa para requisições e compras.")
     
