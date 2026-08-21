@@ -65,9 +65,9 @@ st.sidebar.divider()
 menu_opcao = st.sidebar.radio(
     "Escolha o Módulo",
     [
-        "🚆 Catálogo de Locomotivas (PDF)", 
-        "🛤️ Catálogo de Máquinas de Via (PDF)", 
-        "📋 Código de Materiais (Planilha)"
+        "🚆 Catálogo de Locomotivas", 
+        "🛤️ Catálogo de Máquinas de Via", 
+        "📋 Código de Materiais"
     ],
     key="menu_principal_navegacao"
 )
