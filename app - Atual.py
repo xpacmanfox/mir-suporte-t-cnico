@@ -63,21 +63,10 @@ def buscar_materiais(df, termo_busca):
 
 # --- FUNÇÃO DE BUSCA E GERENCIAMENTO DE CATÁLOGOS EM PDF ---
 def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
-    with st.sidebar:
-        if st.button("🏠 Voltar ao Menu Principal", type="secondary", use_container_width=True):
-            st.session_state.sistema_ativo = None
-            st.rerun()
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.link_button(
-            "🚆 Suporte Técnico Virtual", 
-            "https://mirsuportetecnicogit.streamlit.app/", 
-            type="primary", 
-            use_container_width=True
-        )
-        st.divider()
-        st.caption("Módulo de Suprimentos")
-
+    if st.button("🏠 Voltar ao Menu Principal", type="secondary"):
+        st.session_state.sistema_ativo = None
+        st.rerun()
+        
     st.title(titulo_modulo)
     st.markdown("Consulte peças, descrições e Part Numbers diretamente nos catálogos de fornecedores carregados na base.")
     
@@ -179,31 +168,22 @@ if st.session_state.sistema_ativo is None:
     with col1:
         st.info("### 🚆 Catálogo de Locomotivas")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos em PDF de locomotivas.")
-        if st.button("Acessar Catálogo de Locomotivas", type="primary", use_container_width=True):
+        if st.button("Acessar Catálogo de Locomotivas", type="primary"):
             st.session_state.sistema_ativo = "catalogo_locomotivas"
             st.rerun()
             
         st.info("### 🛤️ Catálogo de Máquinas de Via")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos de máquinas de via permanente.")
-        if st.button("Acessar Catálogo de Máquinas de Via", type="primary", use_container_width=True):
+        if st.button("Acessar Catálogo de Máquinas de Via", type="primary"):
             st.session_state.sistema_ativo = "catalogo_maquinas_via"
             st.rerun()        
             
     with col2:
         st.info("### 📋 Código de Materiais")
         st.markdown("Consulta em planilha com códigos internos da empresa para requisição de materiais.")
-        if st.button("Acessar Código de Materiais", type="primary", use_container_width=True):
+        if st.button("Acessar Código de Materiais", type="primary"):
             st.session_state.sistema_ativo = "codigo_materiais"
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("### 🚆 Suporte Técnico Virtual")
-        st.markdown("Volte ao app principal de atendimento técnico e análise de falhas.")
-        st.link_button(
-            "🔗 Acessar Suporte Técnico", 
-            "https://mirsuportetecnicogit.streamlit.app/", 
-            type="secondary", 
-            use_container_width=True
-        )
+            st.rerun()
 
 # --- ROTEAMENTO DOS MÓDULOS SELECIONADOS ---
 elif st.session_state.sistema_ativo == "catalogo_locomotivas":
@@ -213,20 +193,9 @@ elif st.session_state.sistema_ativo == "catalogo_maquinas_via":
     gerenciar_modulo_catalogo("🛤️ Catálogo de Peças - Máquinas de Via", "./Docs_Catalogos_MaquinasVia")
 
 elif st.session_state.sistema_ativo == "codigo_materiais":
-    with st.sidebar:
-        if st.button("🏠 Voltar ao Menu Principal", type="secondary", use_container_width=True):
-            st.session_state.sistema_ativo = None
-            st.rerun()
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.link_button(
-            "🚆 Suporte Técnico Virtual", 
-            "https://mirsuportetecnicogit.streamlit.app/", 
-            type="primary", 
-            use_container_width=True
-        )
-        st.divider()
-        st.caption("Módulo de Suprimentos")
+    if st.button("🏠 Voltar ao Menu Principal", type="secondary"):
+        st.session_state.sistema_ativo = None
+        st.rerun()
         
     st.title("📋 Buscador de Código de Materiais (Planilha Interna)")
     st.markdown("Consulte rapidamente os códigos internos de materiais da empresa para requisições e compras.")
