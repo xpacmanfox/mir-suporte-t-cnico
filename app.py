@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CSS CUSTOMIZADO PARA PADRONIZAÇÃO VISUAL (BOTÕES EM VERMELHO) ---
+# --- CSS CUSTOMIZADO PARA PADRONIZAÇÃO VISUAL (BOTÕES EM VERMELHO E UNIFORMES) ---
 st.markdown("""
     <style>
         section[data-testid="stSidebar"] * {
@@ -24,7 +24,7 @@ st.markdown("""
         .stTextInput input {
             font-size: 16px !important;
         }
-        /* Padronização de TODOS os botões para vermelho */
+        /* Padronização de TODOS os botões para vermelho com largura uniforme */
         .stButton button, div.stLinkButton a {
             width: 100% !important;
             background-color: #ff4b4b !important;
@@ -34,6 +34,9 @@ st.markdown("""
             font-weight: 600 !important;
             text-align: center !important;
             padding: 0.5rem 1rem !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
         }
         .stButton button:hover, div.stLinkButton a:hover {
             background-color: #ff2b2b !important;
@@ -185,14 +188,14 @@ if st.session_state.sistema_ativo is None:
         st.markdown("---")
         st.subheader("🚆 Catálogo de Locomotivas")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos em PDF de locomotivas.")
-        if st.button("Acessar Catálogo de Locomotivas", key="btn_cat_loc"):
+        if st.button("🚆 Acessar Catálogo de Locomotivas", key="btn_cat_loc"):
             st.session_state.sistema_ativo = "catalogo_locomotivas"
             st.rerun()
             
         st.markdown("---")
         st.subheader("🛤️ Catálogo de Máquinas de Via")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos de máquinas de via permanente.")
-        if st.button("Acessar Catálogo de Máquinas de Via", key="btn_cat_via"):
+        if st.button("🛤️ Acessar Catálogo de Máquinas de Via", key="btn_cat_via"):
             st.session_state.sistema_ativo = "catalogo_maquinas_via"
             st.rerun()        
             
@@ -200,7 +203,7 @@ if st.session_state.sistema_ativo is None:
         st.markdown("---")
         st.subheader("📋 Código de Materiais")
         st.markdown("Consulta em planilha com códigos internos da empresa para requisição de materiais.")
-        if st.button("Acessar Código de Materiais", key="btn_cod_mat"):
+        if st.button("📋 Acessar Código de Materiais", key="btn_cod_mat"):
             st.session_state.sistema_ativo = "codigo_materiais"
             st.rerun()
             
