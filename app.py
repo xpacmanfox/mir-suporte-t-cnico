@@ -12,22 +12,21 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CSS CUSTOMIZADO PARA AUMENTAR AS FONTES ---
+# --- CSS CUSTOMIZADO PARA PADRONIZAÇÃO VISUAL ---
 st.markdown("""
     <style>
-        /* Aumenta a fonte do menu lateral (sidebar) */
         section[data-testid="stSidebar"] * {
             font-size: 16px !important;
         }
-        
-        /* Aumenta a fonte dos textos gerais e tabelas */
         .stMarkdown * {
             font-size: 16px !important;
         }
-        
-        /* Aumenta a fonte dos campos de texto e inputs */
         .stTextInput input {
             font-size: 16px !important;
+        }
+        .stButton button {
+            width: 100%;
+            border-radius: 6px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -36,7 +35,6 @@ st.markdown("""
 if "sistema_ativo" not in st.session_state:
     st.session_state.sistema_ativo = None
 
-# Configuração da API do OpenRouter / OpenAI
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -44,7 +42,6 @@ client = OpenAI(
     default_headers={"HTTP-Referer": "http://localhost", "X-Title": "Mir Materiais"}
 )
 
-# Função de busca inteligente e flexível para planilhas
 def buscar_materiais(df, termo_busca):
     if not termo_busca or df.empty:
         return pd.DataFrame()
@@ -61,10 +58,9 @@ def buscar_materiais(df, termo_busca):
         
     return df[mascara]
 
-# --- FUNÇÃO DE BUSCA E GERENCIAMENTO DE CATÁLOGOS EM PDF ---
 def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
     with st.sidebar:
-        if st.button("🏠 Voltar ao Menu Principal", type="secondary", use_container_width=True):
+        if st.button("🏠 Voltar ao Menu Principal", use_container_width=True):
             st.session_state.sistema_ativo = None
             st.rerun()
             
@@ -72,7 +68,6 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
         st.link_button(
             "🚆 Suporte Técnico Virtual", 
             "https://mirsuportetecnicogit.streamlit.app/", 
-            type="primary", 
             use_container_width=True
         )
         st.divider()
@@ -89,7 +84,7 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
     if aba_cat == "🔍 Realizar Busca":
         termo_busca = st.text_input("Digite o nome da peça, descrição ou Part Number:", key=f"input_{pasta_destino}")
         
-        if st.button("Buscar no Catálogo", type="primary", key=f"btn_busca_{pasta_destino}"):
+        if st.button("Buscar no Catálogo", key=f"btn_busca_{pasta_destino}"):
             if not termo_busca:
                 st.warning("Por favor, digite um termo para buscar.")
             else:
@@ -168,7 +163,6 @@ def gerenciar_modulo_catalogo(titulo_modulo, pasta_destino):
         else:
             st.info("Nenhum PDF cadastrado no momento.")
 
-
 # --- TELA INICIAL: ESCOLHA DE SISTEMA ---
 if st.session_state.sistema_ativo is None:
     st.title("📦 MIR - Central de Gestão de Catálogos e Materiais")
@@ -177,31 +171,34 @@ if st.session_state.sistema_ativo is None:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.info("### 🚆 Catálogo de Locomotivas")
+        st.markdown("---")
+        st.subheader("🚆 Catálogo de Locomotivas")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos em PDF de locomotivas.")
-        if st.button("Acessar Catálogo de Locomotivas", type="primary", use_container_width=True):
+        if st.button("Acessar Catálogo de Locomotivas", key="btn_cat_loc"):
             st.session_state.sistema_ativo = "catalogo_locomotivas"
             st.rerun()
             
-        st.info("### 🛤️ Catálogo de Máquinas de Via")
+        st.markdown("---")
+        st.subheader("🛤️ Catálogo de Máquinas de Via")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos de máquinas de via permanente.")
-        if st.button("Acessar Catálogo de Máquinas de Via", type="primary", use_container_width=True):
+        if st.button("Acessar Catálogo de Máquinas de Via", key="btn_cat_via"):
             st.session_state.sistema_ativo = "catalogo_maquinas_via"
             st.rerun()        
             
     with col2:
-        st.info("### 📋 Código de Materiais")
+        st.markdown("---")
+        st.subheader("📋 Código de Materiais")
         st.markdown("Consulta em planilha com códigos internos da empresa para requisição de materiais.")
-        if st.button("Acessar Código de Materiais", type="primary", use_container_width=True):
+        if st.button("Acessar Código de Materiais", key="btn_cod_mat"):
             st.session_state.sistema_ativo = "codigo_materiais"
+            st.rerun()
             
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("### 🚆 Suporte Técnico Virtual")
+        st.markdown("---")
+        st.subheader("🚆 Suporte Técnico Virtual")
         st.markdown("Volte ao app principal de atendimento técnico e análise de falhas.")
         st.link_button(
             "🔗 Acessar Suporte Técnico", 
             "https://mirsuportetecnicogit.streamlit.app/", 
-            type="secondary", 
             use_container_width=True
         )
 
@@ -214,7 +211,7 @@ elif st.session_state.sistema_ativo == "catalogo_maquinas_via":
 
 elif st.session_state.sistema_ativo == "codigo_materiais":
     with st.sidebar:
-        if st.button("🏠 Voltar ao Menu Principal", type="secondary", use_container_width=True):
+        if st.button("🏠 Voltar ao Menu Principal", use_container_width=True):
             st.session_state.sistema_ativo = None
             st.rerun()
             
@@ -222,7 +219,6 @@ elif st.session_state.sistema_ativo == "codigo_materiais":
         st.link_button(
             "🚆 Suporte Técnico Virtual", 
             "https://mirsuportetecnicogit.streamlit.app/", 
-            type="primary", 
             use_container_width=True
         )
         st.divider()
@@ -240,7 +236,7 @@ elif st.session_state.sistema_ativo == "codigo_materiais":
     if aba_mat == "📋 Realizar Consulta":
         termo_interno = st.text_input("Digite o nome ou código interno do material (ex: Sensor DSS):", key="input_termo_material")
         
-        if st.button("Consultar Materiais", type="primary", key="btn_consulta_materiais"):
+        if st.button("Consultar Materiais", key="btn_consulta_materiais"):
             if not termo_interno:
                 st.warning("Informe um termo para a consulta.")
             else:
