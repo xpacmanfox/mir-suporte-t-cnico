@@ -191,14 +191,14 @@ if st.session_state.sistema_ativo is None:
         st.markdown("---")
         st.subheader("🚆 Catálogo de Locomotivas")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos em PDF de locomotivas.")
-        if st.button("🚆 Acessar Catálogo de Locomotivas", key="btn_cat_loc"):
+        if st.button("🚆 Acessar Catálogo de Locomotivas", key="btn_cat_loc", width="stretch"):
             st.session_state.sistema_ativo = "catalogo_locomotivas"
             st.rerun()
             
         st.markdown("---")
         st.subheader("🛤️ Catálogo de Máquinas de Via")
         st.markdown("Busca inteligente de peças e Part Numbers em catálogos de máquinas de via permanente.")
-        if st.button("🛤️ Acessar Catálogo de Máquinas de Via", key="btn_cat_via"):
+        if st.button("🛤️ Acessar Catálogo de Máquinas de Via", key="btn_cat_via", width="stretch"):
             st.session_state.sistema_ativo = "catalogo_maquinas_via"
             st.rerun()        
             
@@ -206,7 +206,7 @@ if st.session_state.sistema_ativo is None:
         st.markdown("---")
         st.subheader("📋 Código de Materiais")
         st.markdown("Consulta em planilha com códigos internos da empresa para requisição de materiais.")
-        if st.button("📋 Acessar Código de Materiais", key="btn_cod_mat"):
+        if st.button("📋 Acessar Código de Materiais", key="btn_cod_mat", width="stretch"):
             st.session_state.sistema_ativo = "codigo_materiais"
             st.rerun()
             
@@ -216,7 +216,7 @@ if st.session_state.sistema_ativo is None:
         st.link_button(
             "🔗 Acessar Suporte Técnico", 
             "https://mirsuportetecnicogit.streamlit.app/", 
-            use_container_width=True
+            width="stretch"
         )
 
 # --- ROTEAMENTO DOS MÓDULOS SELECIONADOS ---
